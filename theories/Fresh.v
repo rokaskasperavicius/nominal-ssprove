@@ -62,16 +62,16 @@ Qed.
 
 (* fresh *)
 
-Definition fresh {X Y : suppType} (x : X) (y : Y) :=
+Definition fresh {X Y : nomType} (x : X) (y : Y) :=
   fperm (λ a, atomize (offset (supp x) + natize a)) (supp y).
 
-Lemma fresh_disjoint {X Y : suppType} {x : X} {y : Y}
+Lemma fresh_disjoint {X Y : nomType} {x : X} {y : Y}
   : disj x (fresh x y ∙ y).
 Proof.
-  rewrite /disj -suppE.
-  rewrite adjoin_disc_r; [| apply: fdisjointE ].
+  rewrite /disj -supp_equi.
+  rewrite adjoin_disc_r; [| apply: fdisjoint_equi ].
   apply /fdisjointP => a H.
-  rewrite -(adjoin_disc_l in_memE) in H.
+  rewrite -(adjoin_disc_l in_mem_equi) in H.
   apply ltn_offset in H.
   apply /negP => H'.
   rewrite /rename //= in H.
@@ -86,29 +86,21 @@ Proof.
     eapply natizeK.
 Qed.
 
-Lemma supp_equi {X Y : suppType} : ∀{f : X → Y}, equivariant f → ∀ x, support_set (f x) (supp x).
-Proof.
-  intros f E x π H.
-  rewrite E.
-  f_equal.
-  apply is_support.
-  apply H.
-Qed.
-
-Lemma supp_fsubset {X Y : suppType} : ∀{f : X → Y}, equivariant f → ∀ x, fsubset (supp (f x)) (supp x).
+Lemma supp_fsubset {X Y : nomType} : ∀{f : X → Y}, equivariant f → ∀ x, fsubset (supp (f x)) (supp x).
 Proof.
   intros f Ef x.
   apply support_sub.
-  by apply supp_equi.
+  apply equi_support_set; [ done |].
+  apply is_support.
 Qed.
 
-Lemma disjC {X Y : suppType} : ∀ (x : X) (y : Y), disj x y = disj y x.
+Lemma disjC {X Y : nomType} : ∀ (x : X) (y : Y), disj x y = disj y x.
 Proof.
   move => x y.
   rewrite /disj fdisjointC //.
 Qed.
 
-Lemma disj_equi {X Y Z: suppType} (f : X → Z) {E : equivariant f}
+Lemma equi_disj {X Y Z: nomType} (f : X → Z) {E : equivariant f}
   : ∀ (x : X) (y : Y), disj x y → disj (f x) y.
 Proof.
   move => x y.
@@ -120,9 +112,9 @@ Proof.
 Qed.
 
 
-Program Definition atom_HasFiniteSupport
-  : HasFiniteSupport atom
-  := HasFiniteSupport.Build _ (λ a, fset1 a) _ _.
+Program Definition atom_IsNominal
+  : IsNominal atom
+  := IsNominal.Build _ (λ a, fset1 a) _ _.
 Obligation 1.
   intros π H.
   apply H.
@@ -156,8 +148,8 @@ Obligation 2.
   rewrite H ltnn // in H0.
 Qed.
 
-HB.instance Definition _ : HasFiniteSupport atom
-  := atom_HasFiniteSupport.
+HB.instance Definition _ : IsNominal atom
+  := atom_IsNominal.
 
 Lemma support_set_imp {X : nomType} {x : X} {F} {a} {a'}
   : support_set x F → a \notin F → a' \notin F → fperm2 a a' ∙ x = x.
@@ -195,15 +187,15 @@ Proof.
   rewrite atomizeK ltnn // in H.
 Qed.
 
-(* suppType for {fset X} *)
+(* nomType for {fset X} *)
 
-Definition fsetSupp {X : suppOrdType} (xs : {fset X}) := (\bigcup_(x <- xs) (supp x))%fset.
+Definition fsetSupp {X : nomOrdType} (xs : {fset X}) := (\bigcup_(x <- xs) (supp x))%fset.
 
-Lemma fsetSuppU {X : suppOrdType} (x y : {fset X})
+Lemma fsetSuppU {X : nomOrdType} (x y : {fset X})
   : (fsetSupp (x :|: y) = fsetSupp x :|: fsetSupp y)%fset.
 Proof. apply bigcup_fsetU. Qed.
 
-Lemma fsetSupp0 {X : suppOrdType} : fsetSupp (@fset0 X) = fset0.
+Lemma fsetSupp0 {X : nomOrdType} : fsetSupp (@fset0 X) = fset0.
 Proof.
   unfold fsetSupp.
   apply eq_fset => a.
@@ -212,7 +204,7 @@ Proof.
   discriminate.
 Qed.
 
-Lemma fsetSupp1 {X : suppOrdType} (x : X) : fsetSupp (fset1 x) = supp x.
+Lemma fsetSupp1 {X : nomOrdType} (x : X) : fsetSupp (fset1 x) = supp x.
 Proof.
   unfold fsetSupp.
   rewrite -(fsetU0 (fset1 x)).
@@ -222,15 +214,15 @@ Proof.
   apply fsetSupp0.
 Qed.
 
-Lemma fsetSuppE {X : suppOrdType} : equivariant (@fsetSupp X).
+Lemma fsetSuppE {X : nomOrdType} : equivariant (@fsetSupp X).
 Proof.
   intros π.
   refine (fset_ind _ _).
   { rewrite /rename //= fsetSupp0 2!imfset0 fsetSupp0 //. }
   intros x xs _ IH.
-  rewrite (equi2_use _ fsetUE) fset1E'.
+  rewrite (equi2_use _ fsetU_equi) fset1_equi.
   rewrite 2!fsetSuppU 2!fsetSupp1.
-  rewrite (equi2_use _ fsetUE) suppE IH //.
+  rewrite (equi2_use _ fsetU_equi) supp_equi IH //.
 Qed.
   
 Lemma offset_mono {A B : {fset atom}}
@@ -248,13 +240,13 @@ Proof.
   rewrite ltn_offset //.
 Qed.
 
-Lemma fsubset_equi {X : nomType} {x : X} {F} {f : X → {fset atom}}
+Lemma fsubset_equi {X : actionType} {x : X} {F} {f : X → {fset atom}}
   : equivariant f → support_set x F → (f x :<=: F)%fset.
 Proof.
   intros H H'.
   apply /fsubsetP => a.
   apply boolp.contraPP => /negP H''.
-  apply (support_set_equi H) in H'.
+  apply (equi_support_set H) in H'.
   specialize (H' (fperm2 a (neu (a |: F :|: f x)%fset))).
   rewrite -H'.
   2: {
@@ -275,7 +267,7 @@ Proof.
       2: eapply fsubsetUr.
       rewrite ltnn // in H'''.
   }
-  rewrite (adjoin_disc_r in_memE).
+  rewrite (adjoin_disc_r in_mem_equi).
   rewrite fperm2V /rename //= fperm2L.
   apply /negP.
   apply neuE.
@@ -290,15 +282,15 @@ Proof.
 Qed.
 
 
-Program Definition fset_HasFiniteSupport {X : suppOrdType}
-  : HasFiniteSupport {fset X}
-  := HasFiniteSupport.Build _ (λ x : {fset X}, fsetSupp x) _ _.
+Program Definition fset_IsNominal {X : nomOrdType}
+  : IsNominal {fset X}
+  := IsNominal.Build _ (λ x : {fset X}, fsetSupp x) _ _.
 Obligation 1.
   move: x.
   refine (fset_ind _ _).
   { intros π. rewrite /rename //= imfset0 //. }
   move => x xs _ IH π /suppP H.
-  rewrite (equi2_use _ fsetUE) fset1E'.
+  rewrite (equi2_use _ fsetU_equi) fset1_equi.
   rewrite fsetSuppU fsetSupp1 fdisjointUl in H.
   move: H => /andP [H1 H2].
   move: H1 => /suppP H1.
@@ -312,8 +304,8 @@ Obligation 2.
   + apply H.
 Qed.
 
-HB.instance Definition _ {X : suppOrdType} : HasFiniteSupport {fset X}
-  := fset_HasFiniteSupport.
+HB.instance Definition _ {X : nomOrdType} : IsNominal {fset X}
+  := fset_IsNominal.
 
 Open Scope fset.
 
@@ -374,7 +366,7 @@ Proof.
   + apply /fsetUP; by left.
 Qed.
 
-Lemma split_supp_left {X Y : suppType} {Z : suppType} :
+Lemma split_supp_left {X Y Z : nomType} :
   ∀ {x : X} {y : Y} {π τ} {f : X → Z},
   equivariant f →
   disj (π ∙ x) (τ ∙ y) →
@@ -383,8 +375,8 @@ Proof.
   intros x y π τ f E D.
   rewrite split_pi_left.
   + apply E.
-  + by apply supp_equi.
-  + rewrite 2!suppE //.
+  + apply equi_support_set; [ done | apply is_support ].
+  + rewrite 2!supp_equi //.
 Qed.
 
 Lemma split_pi_right {X : nomType} {f g : {fperm atom}} {F G} {O : X} :
@@ -410,7 +402,7 @@ Proof.
   + apply /fsetUP; by right.
 Qed.
 
-Lemma fresh_equi {X Y Z : suppType} {f : Y → Z} {x : X} {y : Y}
+Lemma fresh_equi {X Y Z : nomType} {f : Y → Z} {x : X} {y : Y}
   : equivariant f → fresh x (f y) ∙ (f y) = fresh x y ∙ (f y).
 Proof.
   intros E.
@@ -435,16 +427,16 @@ Proof.
 Qed.
   
 
-Definition move {X Y : suppType} (x : X) (y : Y) : Y := nosimpl (fresh x y ∙ y).
+Definition move {X Y : nomType} (x : X) (y : Y) : Y := nosimpl (fresh x y ∙ y).
 
-Lemma move_equi {X Y Z : suppType} {f : Y → Z} {x : X} {y : Y}
+Lemma move_equi {X Y Z : nomType} {f : Y → Z} {x : X} {y : Y}
   : equivariant f → move x (f y) = f (move x y).
 Proof.
   intros E.
   rewrite /move fresh_equi //.
 Qed.
 
-Lemma move_supp {X Y Z : suppType} {x : X} {z : Z} {y : Y}
+Lemma move_supp {X Y Z : nomType} {x : X} {z : Z} {y : Y}
   : supp x = supp z → move x y = move z y.
 Proof.
   intros E.
@@ -461,14 +453,14 @@ Proof.
   symmetry in H.
   rewrite move_equi //= in H.
   2: by intros ? [? ?].
-  rewrite adjoin_disc_r in H; try apply eqE.
+  rewrite adjoin_disc_r in H; try apply eq_equi.
   by rewrite renameK in H.
 Qed.
   
-Lemma move_disj {X Y : suppType} (x : X) (y : Y) : disj x (move x y).
+Lemma move_disj {X Y : nomType} (x : X) (y : Y) : disj x (move x y).
 Proof. apply fresh_disjoint. Qed.
 
-Lemma move_pair {X Y Z : suppType} {x : X} {y : Y} {z : Z}
+Lemma move_pair {X Y Z : nomType} {x : X} {y : Y} {z : Z}
   : move x (y, z) = (move x y, move x z).
 Proof.
   rewrite {1}/move /rename //=.
@@ -481,7 +473,7 @@ Proof.
   move => π [? ?] //=.
 Qed.
 
-Lemma move_equi2 {X Y Z W : suppType} {f : Y → Z → W} {x : X} {y z} :
+Lemma move_equi2 {X Y Z W : nomType} {f : Y → Z → W} {x : X} {y z} :
   equivariant f → move x (f y z) = f (move x y) (move x z).
 Proof.
   move => H.
@@ -491,12 +483,12 @@ Proof.
   rewrite move_pair //.
 Qed.
 
-Definition dpair {X Y : suppType} (x : X) (y : Y) := pair x (move x y).
+Definition dpair {X Y : nomType} (x : X) (y : Y) := pair x (move x y).
 
-Lemma move_dpair {X Y Z : suppType} {x : X} {y : Y} {z : Z} : move (x, move x y) z  = move (dpair x y) z.
+Lemma move_dpair {X Y Z : nomType} {x : X} {y : Y} {z : Z} : move (x, move x y) z  = move (dpair x y) z.
 Proof. done. Qed.
 
-Lemma move_dpairU {X Y Z W : suppType} {x : X} {y : Y} {z : Z} {f : X → Y → W}
+Lemma move_dpairU {X Y Z W : nomType} {x : X} {y : Y} {z : Z} {f : X → Y → W}
   : supp (f x y) = supp x :|: supp y → move (f x y) z  = move (x, y) z.
 Proof.
   intros H.
@@ -504,7 +496,7 @@ Proof.
   rewrite H //.
 Qed.
 
-Lemma freshE {X Y : suppType} {x : X} {y : Y} {a}
+Lemma freshE {X Y : nomType} {x : X} {y : Y} {a}
   : a \in supp y → fresh x y a = atomize (offset (supp x) + natize a).
 Proof.
   rewrite /fresh => H.
@@ -516,7 +508,7 @@ Proof.
   apply E.
 Qed.
 
-Lemma move0 {X Y : suppType} (x : X) (y : Y) : supp x = fset0 → move x y = y.
+Lemma move0 {X Y : nomType} (x : X) (y : Y) : supp x = fset0 → move x y = y.
 Proof.
   intros H.
   rewrite /move -{3}(rename_id y).
@@ -536,20 +528,20 @@ Proof.
   apply H'.
 Qed.
 
-Lemma supp_supp {X : suppType} {x : X} : supp (supp x) = supp x.
+Lemma supp_supp {X : nomType} {x : X} : supp (supp x) = supp x.
 Proof.
   rewrite supp_atom //.
 Qed.
 
-Lemma fresh_supp_r {X Y : suppType} {x : X} {y : Y} : fresh x (supp y) = fresh x y.
+Lemma fresh_supp_r {X Y : nomType} {x : X} {y : Y} : fresh x (supp y) = fresh x y.
 Proof.
   rewrite /fresh supp_supp //.
 Qed.
 
-Lemma offset_move {X Y : suppType} {x : X} {y : Y}
+Lemma offset_move {X Y : nomType} {x : X} {y : Y}
   : maxn (offset (supp x)) (offset (supp (move x y))) = offset (supp x) + offset (supp y).
 Proof.
-  rewrite -(move_equi suppE).
+  rewrite -(move_equi supp_equi).
   move: (supp y).
   refine (fset_ind _ _). { 
     rewrite offset_fset0 addn0.
@@ -563,7 +555,7 @@ Proof.
   rewrite -H'.
   rewrite maxnA -(maxnC (offset (supp x))) -maxnA.
   f_equal.
-  rewrite (move_equi2 fsetUE) (move_equi fset1E').
+  rewrite (move_equi2 fsetU_equi) (move_equi fset1_equi).
   rewrite offset_fsetU1.
   f_equal.
   rewrite /move /rename //= freshE.
@@ -573,7 +565,7 @@ Qed.
 
 Notation "A #: B" := (move A B) (at level 150, right associativity).
 
-Lemma dpair_move {X Y Z : suppType} {x : X} {y : Y} {z : Z} :
+Lemma dpair_move {X Y Z : nomType} {x : X} {y : Y} {z : Z} :
   move (dpair x y) z = move x (move y z).
 Proof.
   unfold dpair, move.
@@ -582,7 +574,7 @@ Proof.
   rewrite freshE //= fpermM //=.
   rewrite freshE //=.
   2: {
-    rewrite -suppE (adjoin_disc_r in_memE).
+    rewrite -supp_equi (adjoin_disc_r in_mem_equi).
     rewrite renameK //.
   }
   f_equal.

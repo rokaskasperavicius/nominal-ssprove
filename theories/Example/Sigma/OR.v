@@ -529,12 +529,6 @@ Definition A_right p A : nom_package :=
 
 Hint Rewrite @domm_ID : in_fset_eq.
 
-Lemma trimmed_dlink {E} {P Q : nom_package} : trimmed E P → trimmed E (dlink P Q).
-Proof.
-  intros tr.
-  rewrite /trimmed //= -link_trim_commut tr //.
-Qed.
-
 Lemma idents0 : idents fset0 = fset0.
 Proof. rewrite /idents imfset0 //. Qed.
 
@@ -564,7 +558,6 @@ Proof.
   2-5,7-10: move: H2 H3; unfold disj; try fset_solve.
   + rewrite AdvantageD_dlink.
     erewrite -> AdvantageD_dpar_l.
-    6-8: apply: trimmed_dlink.
     2-8: try dprove_valid.
     2:{ rewrite /idents fset_cons -fset0E fsetU0 imfset1 in P. fset_solve. }
 
@@ -572,7 +565,6 @@ Proof.
     erewrite <- (@dpar_empty_r (AuxL p)).
     rewrite -dlink_assoc. 
     erewrite <- swash.
-    7: apply: trimmed_dlink.
     2-7: dprove_valid.
     apply AdvL.
     unfold A_left.
@@ -580,13 +572,11 @@ Proof.
     1,2: apply fsubsetxx.
   + rewrite AdvantageD_dlink.
     erewrite -> AdvantageD_dpar_r.
-    5-7: apply: trimmed_dlink.
     2-7: try dprove_valid.
     rewrite AdvantageD_dlink.
     erewrite <- (@dpar_empty_l (AuxR p)).
     rewrite -dlink_assoc.
     erewrite <- swish.
-    6: apply: trimmed_dlink.
     2-7: try dprove_valid.
     apply AdvR.
     unfold A_right.

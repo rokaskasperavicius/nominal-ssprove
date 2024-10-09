@@ -52,17 +52,12 @@ Set Primitive Projections.
 HB.instance Definition _ : DeclareDiscrete R := DeclareDiscrete.Build R.
 HB.instance Definition _ : DeclareDiscrete Interface := DeclareDiscrete.Build Interface.
 
-Program Definition Location_IsNominal
-  := IsNominal.Build Location (λ π l, (l.π1; natize (π (atomize l.π2)))) _ _.
+Program Definition Location_HasAction
+  := HasAction.Build Location (λ π l, (l.π1; natize (π (atomize l.π2)))) _ _.
 Obligation 1. by elim: x => [T n]. Qed.
 Obligation 2. rewrite fpermM natizeK //. Qed.
 
-HB.instance Definition _ : IsNominal (sigT (λ _, nat)) := Location_IsNominal.
-(*
-HB.instance Definition _ : Choice Location := _.
-HB.instance Definition _ : hasOrd Location := _.
-HB.instance Definition _ : IsNominal Location := Location_IsNominal.
- *)
+HB.instance Definition _ : HasAction (sigT (λ _, nat)) := Location_HasAction.
 
 
 Fixpoint rename_code_def {A} π (c : raw_code A) := 
@@ -75,8 +70,8 @@ Fixpoint rename_code_def {A} π (c : raw_code A) :=
       pkg_core_definition.sampler op (fun y => rename_code_def π (k y))
   end.
 
-Program Definition code_IsNominal {A}
-  := IsNominal.Build (raw_code A) rename_code_def _ _.
+Program Definition code_HasAction {A}
+  := HasAction.Build (raw_code A) rename_code_def _ _.
 Obligation 1.
   elim: x; intros; try destruct l; simpl; try setoid_rewrite H; reflexivity.
 Qed.
@@ -85,7 +80,7 @@ Obligation 2.
   1,2: unfold rename; simpl; rewrite fpermM natizeK //.
 Qed.
 
-HB.instance Definition _ {A} : IsNominal (raw_code A) := code_IsNominal.
+HB.instance Definition _ {A} : HasAction (raw_code A) := code_HasAction.
 
 Lemma mcode_bind {A B} : ∀ f (c : raw_code A) (k : A → raw_code B),
   rename f (a ← c ;; k a) = (a ← rename f c ;; rename f (k a)).
@@ -129,8 +124,8 @@ Definition mtyped f : typed_raw_function → typed_raw_function
               | (T; P; k) => (T; P; fun s => rename f (k s))
               end.
 
-Program Definition typed_IsNominal : IsNominal typed_raw_function
-  := IsNominal.Build _ mtyped _ _.
+Program Definition typed_HasAction : HasAction typed_raw_function
+  := HasAction.Build _ mtyped _ _.
 Obligation 1.
   destruct x as [S [T k]].
   simpl.
@@ -144,11 +139,11 @@ Obligation 2.
   by setoid_rewrite rename_comp.
 Qed.
 
-HB.instance Definition _ : IsNominal typed_raw_function
-  := typed_IsNominal.
+HB.instance Definition _ : HasAction typed_raw_function
+  := typed_HasAction.
 
-Program Definition raw_package_IsNominal : IsNominal raw_package
-  := IsNominal.Build _ (λ π, mapm (rename π)) _ _.
+Program Definition raw_package_HasAction : HasAction raw_package
+  := HasAction.Build _ (λ π, mapm (rename π)) _ _.
 Obligation 1.
   apply eq_fmap => i.
   rewrite mapmE.
@@ -161,8 +156,8 @@ Obligation 2.
   rewrite //= rename_comp //.
 Qed.
 
-HB.instance Definition _ : IsNominal raw_package
-  := raw_package_IsNominal.
+HB.instance Definition _ : HasAction raw_package
+  := raw_package_HasAction.
 
 #[export]
 Instance rename_valid {L I E p} f :
@@ -197,12 +192,6 @@ Fixpoint importless {A} (c : raw_code A) :=
       pkg_core_definition.sampler op (fun x => importless (k x))
   end.
 
-Lemma renameK {X : nomType} π : cancel (@rename X π) (rename π^-1%fperm).
-Proof.
-  intros x.
-  rewrite renameK //.
-Qed.
-
 Lemma r_rename {A} π (c : raw_code A) :
     ⊢ ⦃ λ '(h₀, h₁), my_inv' π (h₀, h₁) ⦄
         importless c ≈ importless (π ∙ c)
@@ -230,6 +219,7 @@ Proof.
         ** by apply H1.
         ** apply /negP.
            move => /eqP E.
+           simpl in E.
            apply (f_equal (rename π^-1%fperm)) in E.
            rewrite renameK in E.
            unfold rename in E; simpl in E.

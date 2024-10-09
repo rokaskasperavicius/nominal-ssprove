@@ -24,6 +24,7 @@ Set Default Goal Selector "!".
 Set Primitive Projections.
 
 
+
 Local Open Scope ring_scope.
 Import GroupScope GRing.Theory.
 
@@ -53,13 +54,13 @@ Notation " P  ⊛  P' " :=
   : package_scope.
   
 
-Lemma rename_alpha {X : nomType} {O : X} {π} : π ∙ O ≡ O.
+Lemma rename_alpha {X : actionType} {O : X} {π} : π ∙ O ≡ O.
 Proof.
-  setoid_symmetry.
-  eexists; reflexivity.
+  exists (π^-1)%fperm.
+  rewrite renameK //.
 Qed.
 
-Lemma rename_alpha_both {X : nomType} {O : X} {π π'} : π ∙ O ≡ π' ∙ O.
+Lemma rename_alpha_both {X : actionType} {O : X} {π π'} : π ∙ O ≡ π' ∙ O.
 Proof.
   setoid_rewrite rename_alpha.
   setoid_reflexivity.
@@ -77,36 +78,14 @@ Proof.
   by setoid_rewrite rename_alpha.
 Qed.
 
-(*
-Lemma fdisjoint_rename {A} {X : nomType A} {L L' : X} {π}
-  : fdisjoint L L' → fdisjoint (π ∙ L) (π ∙ L').
-Proof.
-  apply equi2_use.
-  move => /fdisjointP H'.
-  apply /fdisjointP => x H''.
-  rewrite -(fperm_invK π).
-  rewrite -in_rename_adj.
-  apply H'.
-  rewrite in_rename_adj.
-  rewrite fperm_invK //.
-Qed.
-
-Lemma fresh_disjoint_sub_r {A B L L'}
-  : fsubset A L → fsubset B L' → fdisjoint (fresh L L' ∙ B) A.
-Proof.
-  rewrite fdisjointC.
-  apply fresh_disjoint_sub.
-Qed.
- *)
-
-Lemma disj_rename {X Y : suppType} {x : X} {y : Y} {π} :
+Lemma disj_rename {X Y : nomType} {x : X} {y : Y} {π} :
   disj x y → disj (π ∙ x) (π ∙ y).
 Proof.
   intros H.
-  rewrite -(equi2_use _ disjE) H //.
+  rewrite -(equi2_use _ disj_equi) H //.
 Qed.
 
-Lemma equi_fresh_disj {X Y Z W : suppType} {x : X} {y : Y} :
+Lemma equi_fresh_disj {X Y Z W : nomType} {x : X} {y : Y} :
   ∀ {f : X → Z} {g : Y → W},
   equivariant f →
   equivariant g →
@@ -114,8 +93,8 @@ Lemma equi_fresh_disj {X Y Z W : suppType} {x : X} {y : Y} :
 Proof.
   intros f g Ef Eg.
   rewrite Ef.
-  rewrite disj_equi //.
-  rewrite disjC disj_equi //.
+  rewrite equi_disj //.
+  rewrite disjC equi_disj //.
   apply: fresh_disjoint.
 Qed.
 
@@ -137,57 +116,15 @@ Proof.
   + by apply fsetUS.
 Qed.
 
-(*
-Lemma s_nom_ID {I} : s (nom_ID I) = fset0.
-Proof. rewrite /nom_ID /s imfset0 //. Qed.
 
-Create HintDb fresh_db.
-#[export] Hint Resolve fdisjoint_rename : fresh_db.
-#[export] Hint Resolve fresh_disjoint_sub fresh_disjoint_sub_r : fresh_db.
-#[export] Hint Resolve fsubsetxx fsetUl fsetUr : fresh_db.
-#[export] Hint Resolve fdisjoint0s fdisjoints0 : fresh_db.
-#[export] Hint Extern 2 (is_true (fdisjoint (_ :|: _) _)) =>
-  rewrite fdisjointUl ;
-  apply /andP ;
-  split : fresh_db.
-#[export] Hint Extern 2 (is_true (fdisjoint _ (_ :|: _))) =>
-  rewrite fdisjointUr ;
-  apply /andP ;
-  split : fresh_db.
-
-Ltac fresh_disjoint :=
-  try rewrite !s_nom_link ;
-  try rewrite !s_nom_par ;
-  try rewrite -!s_equi ;
-  try rewrite !s_nom_ID ;
-  auto with fresh_db nocore.
-(* fresh_rec ; try fset_solve. *)
-
-Create HintDb alpha_db.
-
-#[export] Hint Extern 1 (alpha (rename _ _) _) =>
-  rewrite rename_alpha : alpha_db.
-
-#[export] Hint Extern 1 (alpha _ (rename _ _)) =>
-  rewrite rename_alpha : alpha_db.
-
-#[export] Hint Extern 10 (alpha _ _) =>
-  reflexivity : alpha_db.
-
-#[export] Hint Extern 5 (is_true (fdisjoint _ _)) =>
-  fresh_disjoint : alpha_db.
-
-#[export] Hint Resolve nom_link_congr nom_par_congr : alpha_db.
- *)
-
-Lemma subs_equi {X Y : suppType} {x : X} {f : X → Y} :
+Lemma subs_equi {X Y : nomType} {x : X} {f : X → Y} :
   equivariant f → subs (f x) x.
 Proof.
   intros E.
   by apply supp_fsubset.
 Qed.
 
-Lemma subs_equi_eq {X Y : suppType} {x : X} {y : Y} {f : X → Y} :
+Lemma subs_equi_eq {X Y : nomType} {x : X} {y : Y} {f : X → Y} :
   equivariant f → y = f x → subs y x.
 Proof.
   intros Ef eq.
@@ -195,7 +132,7 @@ Proof.
   by apply subs_equi.
 Qed.
 
-Lemma subs_fresh_disj {X Y Z W : suppType} {x : X} {x' : Z} {y : Y} {y' : W} :
+Lemma subs_fresh_disj {X Y Z W : nomType} {x : X} {x' : Z} {y : Y} {y' : W} :
   subs x' x →
   subs y' y →
   disj (fresh y x ∙ x') y'.
@@ -212,7 +149,7 @@ Proof.
   apply fresh_disjoint.
 Qed.
 
-Lemma subs_fresh_disj_2 {X Y Z W : suppType} {x : X} {x' : Z} {y : Y} {y' : W} :
+Lemma subs_fresh_disj_2 {X Y Z W : nomType} {x : X} {x' : Z} {y : Y} {y' : W} :
   subs x' x →
   subs y' y →
   disj y' (fresh y x ∙ x').
@@ -225,7 +162,7 @@ Create HintDb alpha_db.
 #[export] Hint Resolve subs_fresh_disj subs_fresh_disj_2 : alpha_db.
 #[export] Hint Resolve disj_rename : alpha_db.
 
-Lemma subs_supp_fsetUl {X Y Z W : suppType} {x : X} {y z} {f : Y → Z → W}
+Lemma subs_supp_fsetUl {X Y Z W : nomType} {x : X} {y z} {f : Y → Z → W}
   : supp (f y z) = supp y :|: supp z → subs x y → subs x (f y z).
 Proof.
   intros H H'.
@@ -234,7 +171,7 @@ Proof.
   apply fsubsetUl.
 Qed.
 
-Lemma subs_supp_fsetUr {X Y Z W : suppType} {x : X} {y z} {f : Y → Z → W}
+Lemma subs_supp_fsetUr {X Y Z W : nomType} {x : X} {y z} {f : Y → Z → W}
   : supp (f y z) = supp y :|: supp z → subs x z → subs x (f y z).
 Proof.
   intros H H'.
@@ -245,21 +182,21 @@ Qed.
 
 #[export] Hint Resolve subs_supp_fsetUl subs_supp_fsetUr : alpha_db.
 
-Lemma supp_pair {X Y : suppType} {x : X} {y : Y}
+Lemma supp_pair {X Y : nomType} {x : X} {y : Y}
   : supp (pair x y) = supp x :|: supp y.
 Proof. done. Qed.
 
 #[export] Hint Resolve s_nom_link s_nom_par supp_pair : alpha_db.
 
 
-Lemma subs_refl {X : suppType} {x : X} : subs x x.
+Lemma subs_refl {X : nomType} {x : X} : subs x x.
 Proof.
   apply fsubsetxx.
 Qed.
 
 #[export] Hint Resolve subs_refl : alpha_db.
 
-Lemma disj_nom_link {X : suppType} {x : X} {P Q}
+Lemma disj_nom_link {X : nomType} {x : X} {P Q}
   : disj x P → disj x Q → disj x (nom_link P Q).
 Proof.
   intros dP dQ.
@@ -270,7 +207,7 @@ Proof.
   by split.
 Qed.
 
-Lemma disj_nom_link2 {X : suppType} {x : X} {P Q}
+Lemma disj_nom_link2 {X : nomType} {x : X} {P Q}
   : disj P x → disj Q x → disj (nom_link P Q) x.
 Proof.
   intros dP dQ.
@@ -278,7 +215,7 @@ Proof.
   rewrite disj_nom_link //; rewrite disjC //.
 Qed.
 
-Lemma disj_equi2 {X Y Z W : suppType} {x : X} {y : Y} {z : Z} {f}
+Lemma disj_equi2 {X Y Z W : nomType} {x : X} {y : Y} {z : Z} {f}
   : equivariant (f : Y → Z → W) → disj x y → disj x z → disj x (f y z).
 Proof.
   intros E D1 D2.
@@ -293,7 +230,7 @@ Proof.
     split; rewrite fdisjointC //.
 Qed.
 
-Lemma disj_equi2' {X Y Z W : suppType} {x : X} {y : Y} {z : Z} {f}
+Lemma disj_equi2' {X Y Z W : nomType} {x : X} {y : Y} {z : Z} {f}
   : equivariant (f : Y → Z → W) → disj x y → disj x z → disj (f y z) x.
 Proof.
   intros E D1 D2.
@@ -313,18 +250,18 @@ Proof.
   apply rename_nom_par.
 Qed.
 
-Lemma supp0 {X : suppOrdType} : supp (@fset0 X) = fset0.
+Lemma supp0 {X : nomOrdType} : supp (@fset0 X) = fset0.
 Proof.
   rewrite /supp //= fsetSupp0 //.
 Qed.
 
-Lemma disj_nom_ID_l {X : suppType} {x : X} {I} : disj (nom_ID I) x.
+Lemma disj_nom_ID_l {X : nomType} {x : X} {I} : disj (nom_ID I) x.
 Proof.
   rewrite /disj /supp //= supp0.
   apply fdisjoint0s.
 Qed.
 
-Lemma disj_nom_ID_r {X : suppType} {x : X} {I} : disj x (nom_ID I).
+Lemma disj_nom_ID_r {X : nomType} {x : X} {I} : disj x (nom_ID I).
 Proof.
   rewrite /disj /supp //= supp0.
   apply fdisjoints0.
@@ -512,7 +449,7 @@ Qed.
  *)
 
 
-Lemma alpha_equi {X Y : nomType} {P P'} {f : X → Y}
+Lemma alpha_equi {X Y : actionType} {P P'} {f : X → Y}
 : equivariant f → P ≡ P' → f P ≡ f P'.
 Proof.
   intros equif [π eq].
@@ -666,7 +603,7 @@ Proof.
   rewrite link_dlink ?link_dlink //.
 Qed.
 
-Lemma equi_pair {X Y : nomType} : equivariant (@pair X Y).
+Lemma equi_pair {X Y : actionType} : equivariant (@pair X Y).
 Proof.
   by apply equi2_prove => π x y.
 Qed.
@@ -817,21 +754,6 @@ Lemma s_nom {L I p} {V : ValidPackage L I (exports p) p} : supp (nom p) = supp L
 Proof. done. Qed.
 #[export] Hint Rewrite @s_nom : in_fset_eq.
 
-(* Definition nom {L I E} : package L I E → nom_package := λ P, nom_from_valid P. *)
-
-(*
-Lemma exports_flat {p} : flat (exports p).
-Proof.
-
-Lemma nom_from_package {L I E} : ∀ P : package L I E, trimmed E P → ValidPackage L I (exports P) P.
-Proof.
-  intros p T.
-
-#[export]
-Hint Extern 2 (ValidPackage ?L ?I (exports (pack ?p)) (pack ?p)) =>
-  apply nom_from_package ; trimmed_cons
-  : typeclass_instances ssprove_valid_db.
-*)
 
 #[export]
 Instance nom_valid {L I p} (V : ValidPackage L I (exports p) p)
@@ -943,7 +865,7 @@ Ltac dprove_rec :=
   | |- (trimmed ?E1 (val (nom_ID ?E2))) =>
       apply trimmed_ID
   | |- (trimmed ?E ?P) =>
-      (try assumption) || trimmed_cons
+      (try assumption) || dprove_trimmed
   | |- ?x =>
       done ||
       (* idtac x ; *)

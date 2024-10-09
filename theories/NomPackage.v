@@ -43,9 +43,9 @@ From NominalSSP Require Import Nominal Fresh Pr.
 
 (* Support lemmas *)
 
-Program Definition Location_HasFiniteSupport
-  : HasFiniteSupport Location
-  := HasFiniteSupport.Build _ (λ '(_; l), fset1 (atomize l)) _ _.
+Program Definition Location_IsNominal
+  : IsNominal Location
+  := IsNominal.Build _ (λ '(_; l), fset1 (atomize l)) _ _.
 Obligation 1.
   intros π H.
   unfold rename; simpl.
@@ -64,11 +64,11 @@ Obligation 2.
   rewrite -(natizeK (π _)) E //.
 Qed.
 
-HB.instance Definition _ : HasFiniteSupport (sigT (λ _, nat))
-  := Location_HasFiniteSupport.
+HB.instance Definition _ : IsNominal (sigT (λ _, nat))
+  := Location_IsNominal.
 (*
-HB.instance Definition _ : HasFiniteSupport Location 
-  := Location_HasFiniteSupport.
+HB.instance Definition _ : IsNominal Location 
+  := Location_IsNominal.
  *)
 
 
@@ -252,7 +252,7 @@ Proof.
     by setoid_rewrite H.
 Qed.
 
-Lemma supp_fsetU {X : suppOrdType} {A B : {fset X}} : supp (A :|: B) = supp A :|: supp B.
+Lemma supp_fsetU {X : nomOrdType} {A B : {fset X}} : supp (A :|: B) = supp A :|: supp B.
 Proof. apply fsetSuppU. Qed.
 
 (* holds for any equivariant binary function? *)
@@ -395,36 +395,20 @@ Qed.
 
 (* Definition as Nominal *)
 
-(* redundant
-Lemma rename_support {π p L} : support_set p L → support_set (π ∙ p) (π ∙ L).
-Proof.
-  intros S π' H.
-  eapply (bij_inj (@rename_bij _ _ _ π^-1)%fperm).
-  rewrite nominal_cancel -2!rename_comp.
-  apply S.
-  intros a H'.
-  rewrite fpermM //= fpermM //=.
-  rewrite H. { apply fpermK. }
-  rewrite -(imfset_equi proj_equi).
-  unfold rename; simpl. eapply mem_imfset in H'.
-  apply H'.
-Qed.
- *)
 
-
-Lemma rename_support_set {X : nomType}
+Lemma rename_support_set {X : actionType}
   : ∀{x : X} {loc} {π}, support_set x loc → support_set (π ∙ x) (rename π loc).
 Proof.
   intros x loc π ss.
-  rewrite -(equi2_use _ support_setE).
+  rewrite -(equi2_use _ support_set_equi).
   rewrite absorb //.
 Qed.
 
-Program Definition nom_package_IsNominal
-  := IsNominal.Build nom_package
+Program Definition nom_package_HasAction
+  := HasAction.Build nom_package
     (λ π P, mkNom (π ∙ loc P) (π ∙ val P) (rename_support_set (has_support P))) _ _.
 Obligation 1.
-  rewrite suppE //.
+  rewrite supp_equi //.
 Qed.
 Obligation 2.
   apply eq_nom_package; rewrite //= rename_id //.
@@ -433,8 +417,8 @@ Obligation 3.
   apply eq_nom_package; rewrite //= rename_comp //.
 Qed.
 
-HB.instance Definition _ : IsNominal nom_package
-  := nom_package_IsNominal.
+HB.instance Definition _ : HasAction nom_package
+  := nom_package_HasAction.
 
 Lemma supp_atoms (A : {fset atom}) : supp A = A.
 Proof.
@@ -446,9 +430,9 @@ Proof.
   rewrite fset_cons fsetSuppU fsetSupp1 H //.
 Qed.
 
-Program Definition nom_package_HasFiniteSupport
-  : HasFiniteSupport nom_package
-  := HasFiniteSupport.Build _ (λ p, supp (loc p)) _ _.
+Program Definition nom_package_IsNominal
+  : IsNominal nom_package
+  := IsNominal.Build _ (λ p, supp (loc p)) _ _.
 Obligation 1.
   intros π H.
   apply eq_nom_package; rewrite /rename //=.
@@ -465,37 +449,14 @@ Obligation 2.
   rewrite 2!H1 //.
 Qed.
 
-HB.instance Definition _ : HasFiniteSupport nom_package
-  := nom_package_HasFiniteSupport.
+HB.instance Definition _ : IsNominal nom_package
+  := nom_package_IsNominal.
 
-(*
-Definition s : nom_package → {fset nat_ordType} := λ P, proj @: loc P.
-
-Lemma s_equi : equivariant s.
-Proof.
-  apply (comp_equi _ _ (imfset_equi proj_equi) loc_equi).
-Qed.
-
-Lemma support_s {P : nom_package} : support_set P (s P).
-Proof.
-  intros π H.
-  apply eq_nom_package; rewrite /rename //=.
-  + apply support_proj, H.
-  + apply has_support, H.
-Qed.
-
-Lemma rename_union {A X : ordType} `{Nominal A X} {π} {L L' : {fset X}}
-  : π ∙ (L :|: L') = (π ∙ L) :|: (π ∙ L').
-Proof.
-  unfold rename. simpl. rewrite imfsetU //.
-Qed.
-
- *)
 Lemma loc_nom_link {P P' : nom_package} {π}
   : loc (π ∙ nom_link P P') = loc (π ∙ P) :|: loc (π ∙ P').
 Proof.
   simpl.
-  rewrite (equi2_use _ fsetUE) //.
+  rewrite (equi2_use _ fsetU_equi) //.
 Qed.
 
 Lemma s_nom_link {P P' : nom_package}
@@ -554,7 +515,7 @@ Proof.
   1: rewrite split_pi_right; [ done | | done |].
   1: apply (is_support Q).
   2: apply (is_support P).
-  1,2: rewrite 2!suppE.
+  1,2: rewrite 2!supp_equi.
   1,2: apply D2.
 Qed.
 
@@ -573,16 +534,19 @@ Proof.
   1: rewrite split_pi_right; [ done | | done |].
   1: apply (is_support Q).
   2: apply (is_support P).
-  1,2: rewrite 2!suppE.
+  1,2: rewrite 2!supp_equi.
   1,2: apply D2.
 Qed.
 
 
 (* trimmed_package *)
 
-Ltac trimmed_cons :=
+Lemma trimmed_link {E} {P Q} : trimmed E P → trimmed E (link P Q).
+Proof. intros tr. rewrite /trimmed -link_trim_commut tr //. Qed.
+
+Ltac dprove_trimmed :=
   (try apply trimmed_empty_package) ||
-  (apply trimmed_package_cons; trimmed_cons).
+  ((apply trimmed_link || apply trimmed_package_cons); dprove_trimmed).
 
 Record trimmed_package L I E :=
   (* we do not coerce through package as it makes for two coercion paths to raw_pacakge *)
@@ -607,14 +571,14 @@ Proof. apply tr_package. Qed.
 Hint Rewrite @s_nom_par @s_nom_link @imfset_fset @map_cons : in_fset_eq.
 
 
-Notation is_trimmed P := (Build_trimmed_package P%pack (ltac:(trimmed_cons)))
+Notation is_trimmed P := (Build_trimmed_package P%pack (ltac:(dprove_trimmed)))
   (only parsing).
 
 
 Notation "[ 'trimmed_package' ]" :=
   (Build_trimmed_package
     (mkpackage (mkfmap [::]) _)
-    ltac:(trimmed_cons)
+    ltac:(dprove_trimmed)
   )
   ( at level 0
   , only parsing )
@@ -623,7 +587,7 @@ Notation "[ 'trimmed_package' ]" :=
 Notation "[ 'trimmed_package' x1 ]" :=
   (Build_trimmed_package
     (mkpackage (mkfmap (x1 :: [::])) _)
-    ltac:(trimmed_cons)
+    ltac:(dprove_trimmed)
   )
   ( at level 0
   , x1 custom package at level 2
@@ -633,7 +597,7 @@ Notation "[ 'trimmed_package' x1 ]" :=
 Notation "[ 'trimmed_package' x1 ; x2 ; .. ; xn ]" :=
   (Build_trimmed_package
     (mkpackage (mkfmap (x1 :: x2 :: .. [:: xn] ..)) _)
-    ltac:(trimmed_cons)
+    ltac:(dprove_trimmed)
   )
   ( at level 0
   , x1 custom package at level 2

@@ -1059,7 +1059,7 @@ Section KEMDEM.
     done.
   Qed.
 
-  Lemma supp1 {X : suppOrdType} {x : X} : supp (fset1 x) = supp x.
+  Lemma supp1 {X : nomOrdType} {x : X} : supp (fset1 x) = supp x.
   Proof. apply fsetSupp1. Qed.
 
   (*
@@ -1068,11 +1068,11 @@ Section KEMDEM.
   #[local] Hint Rewrite @supp1 : in_fset_eq.
    *)
 
-  Lemma supp_cons {X : suppOrdType} {x : X} {xs}
+  Lemma supp_cons {X : nomOrdType} {x : X} {xs}
     : supp (fset (cons x xs)) = supp x :|: supp (fset xs).
   Proof. by rewrite fset_cons supp_fsetU supp1. Qed.
 
-  Lemma supp_nil {X : suppOrdType}
+  Lemma supp_nil {X : nomOrdType}
     : supp (fset (@nil X)) = fset0.
   Proof. by rewrite -fset0E supp0. Qed.
 

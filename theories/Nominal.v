@@ -35,32 +35,33 @@ Proof. done. Qed.
 HB.instance Definition _ : Equality atom := _.
 HB.instance Definition _ : hasChoice atom := _.
 HB.instance Definition _ : hasOrd atom := _.
-(*
+
+(* This ordering does not produce an ordType for atom.
 HB.instance Definition _ : Equality atom := Equality.copy atom (can_type natizeK).
 HB.instance Definition _ : hasChoice atom := CanHasChoice natizeK.
 HB.instance Definition _ : hasOrd atom := CanHasOrd natizeK.
  *)
 
 
-HB.mixin Record IsNominal X := {
+HB.mixin Record HasAction X := {
   rename : {fperm atom} → X → X;
   rename_id : ∀ x, rename 1%fperm x = x;
   rename_comp : ∀ f g x, rename (f * g)%fperm x = rename f (rename g x);
 }.
 
-#[short(type="nomType")]
-HB.structure Definition Nominal := { X of IsNominal X }.
+#[short(type="actionType")]
+HB.structure Definition Action := { X of HasAction X }.
 
 Arguments rename {_} _%fperm & _.
-Implicit Types X Y Z W : nomType.
+Implicit Types X Y Z W : actionType.
 Implicit Types π τ : {fperm atom}.
 
-(* NomOrd is defined here, so that all `nomType`s will
+(* ActionOrd is defined here, so that all `actionOrdType`s will
    also become `NomOrd.type`s. Could also be solved with
    HB.saturate *)
-#[short(type="nomOrdType")]
-HB.structure Definition NomOrd
-  := { X of hasOrd X & Choice X & IsNominal X }.
+#[short(type="actionOrdType")]
+HB.structure Definition ActionOrd
+  := { X of hasOrd X & Choice X & HasAction X }.
 
 
 Declare Scope nominal_scope.
@@ -80,15 +81,15 @@ Lemma renameKV {X} : ∀ π, cancel (rename π^-1) (@rename X π).
 Proof. move => π x. rewrite -rename_comp fperm_mulsV rename_id //. Qed.
 
 
-(* Instances of nomType *)
+(* Instances of actionType *)
 
-Program Definition to_Nominal := IsNominal.Build atom appf _ _.
+Program Definition atom_Action := HasAction.Build atom appf _ _.
 Obligation 2. rewrite fpermM //. Qed.
-HB.instance Definition _ : IsNominal atom := to_Nominal.
+HB.instance Definition _ : HasAction atom := atom_Action.
 
 
-Program Definition fset_IsNominal {X : nomOrdType} : IsNominal {fset X}
-  := IsNominal.Build {fset X} (λ π xs, imfset (rename π) xs) _ _.
+Program Definition fset_HasAction {X : actionOrdType} : HasAction {fset X}
+  := HasAction.Build {fset X} (λ π xs, imfset (rename π) xs) _ _.
 Obligation 1.
   rewrite -{2}(imfset_id x).
   apply eq_imfset => l.
@@ -100,13 +101,13 @@ Obligation 2.
   rewrite rename_comp //.
 Qed.
 
-HB.instance Definition _ {X : nomOrdType} : IsNominal {fset X}
-  := fset_IsNominal.
+HB.instance Definition _ {X : actionOrdType} : HasAction {fset X}
+  := fset_HasAction.
 
 
-Program Definition option_IsNominal {X}
-  : IsNominal (option X)
-  := IsNominal.Build _ (λ π, omap (rename π))  _ _.
+Program Definition option_HasAction {X}
+  : HasAction (option X)
+  := HasAction.Build _ (λ π, omap (rename π))  _ _.
 Obligation 1.
   destruct x; rewrite //= rename_id //.
 Qed.
@@ -114,17 +115,17 @@ Obligation 2.
   destruct x; rewrite //= rename_comp //.
 Qed.
 
-HB.instance Definition _ {X} : IsNominal (option X)
-  := option_IsNominal.
+HB.instance Definition _ {X} : HasAction (option X)
+  := option_HasAction.
 
-Program Definition prod_IsNominal {X Y}
-  : IsNominal (prod X Y)
-  := IsNominal.Build _ (λ π '(x, y), (π ∙ x, π ∙ y)) _ _.
+Program Definition prod_HasAction {X Y}
+  : HasAction (prod X Y)
+  := HasAction.Build _ (λ π '(x, y), (π ∙ x, π ∙ y)) _ _.
 Obligation 1. rewrite 2!rename_id //. Qed.
 Obligation 2. rewrite 2!rename_comp //. Qed.
 
-HB.instance Definition _ {X Y} : IsNominal (prod X Y)
-  := prod_IsNominal.
+HB.instance Definition _ {X Y} : HasAction (prod X Y)
+  := prod_HasAction.
 
 #[local]
 Lemma fperm_1_inv {T : ordType} : @fperm_inv T 1%fperm = 1%fperm.
@@ -142,9 +143,9 @@ Proof.
   rewrite fperm_mulsV fperm_muls1 fperm_mulsV //.
 Qed.
 
-Program Definition fun_IsNominal {X Y}
-  : IsNominal (X → Y)
-  := IsNominal.Build _ (λ π f x, π ∙ f (π^-1%fperm ∙ x)) _ _.
+Program Definition fun_HasAction {X Y}
+  : HasAction (X → Y)
+  := HasAction.Build _ (λ π f x, π ∙ f (π^-1%fperm ∙ x)) _ _.
 Obligation 1.
   move: x => f.
   apply functional_extensionality => x.
@@ -156,8 +157,8 @@ Obligation 2.
   rewrite fperm_mul_inv 2!rename_comp //.
 Qed.
 
-HB.instance Definition _ {X Y} : IsNominal (X → Y)
-  := fun_IsNominal.
+HB.instance Definition _ {X Y} : HasAction (X → Y)
+  := fun_HasAction.
 
 
 (* support set *)
@@ -168,41 +169,41 @@ Definition support_set {X} (x : X) (L : {fset atom})
 Arguments support_set {_} _ _%fset.
 
 (* Does not work with X - probably because of implicit type *)
-HB.mixin Record HasFiniteSupport A of IsNominal A := {
+HB.mixin Record IsNominal A of HasAction A := {
   supp : A → {fset atom};
   is_support : ∀ x, support_set x (supp x);
   support_sub : ∀ x F, support_set x F → fsubset (supp x) F;
 }.
 
-#[short(type="suppType")]
-HB.structure Definition FiniteSupport
-  := { X of HasFiniteSupport X & IsNominal X }.
+#[short(type="nomType")]
+HB.structure Definition Nominal
+  := { X of IsNominal X & HasAction X }.
 
-#[short(type="suppOrdType")]
-HB.structure Definition SuppOrd
-  := { X of hasOrd X & Choice X & IsNominal X & HasFiniteSupport X }.
+#[short(type="nomOrdType")]
+HB.structure Definition NominalOrd
+  := { X of hasOrd X & Choice X & IsNominal X & HasAction X }.
 
 
 (* discrete nominal types *)
 
-HB.mixin Record IsDiscrete (X : Type) of IsNominal X :=
+HB.mixin Record IsDiscrete (X : Type) of HasAction X :=
   { absorb : ∀ π (x : X), π ∙ x = x }.
 
 #[short(type="discType")]
 HB.structure Definition Discrete
-  := { D of IsDiscrete D & HasFiniteSupport D & IsNominal D }.
+  := { D of IsDiscrete D & HasAction D & IsNominal D }.
 
 HB.factory Record DeclareDiscrete (X : Type) := {}.
 
 HB.builders Context (X : Type) (_ : DeclareDiscrete X).
 
-  Program Definition to_Nominal := IsNominal.Build X
+  Program Definition to_Action := HasAction.Build X
     (λ _, id) _ _.
-  HB.instance Definition _ : IsNominal X := to_Nominal.
+  HB.instance Definition _ : HasAction X := to_Action.
 
-  Program Definition to_Support := HasFiniteSupport.Build X (λ _, fset0) _ _.
+  Program Definition to_Nominal := IsNominal.Build X (λ _, fset0) _ _.
   Obligation 2. apply fsub0set. Qed.
-  HB.instance Definition _ : HasFiniteSupport X := to_Support.
+  HB.instance Definition _ : IsNominal X := to_Nominal.
 
   Program Definition to_Discrete := IsDiscrete.Build X _.
   HB.instance Definition _ : IsDiscrete X := to_Discrete.
@@ -211,9 +212,17 @@ HB.end.
 HB.instance Definition _ : DeclareDiscrete bool := DeclareDiscrete.Build bool.
 HB.instance Definition _ : DeclareDiscrete Prop := DeclareDiscrete.Build Prop.
 
-(*
+Lemma support_set_disc {D : discType} : ∀ d : D, support_set d fset0.
+Proof. intros d π _.  rewrite absorb //. Qed.
+
 Lemma supp_disc {D : discType} : ∀ d : D, supp d = fset0.
-*)
+Proof.
+  intros d.
+  apply/ eqP.
+  rewrite -fsubset0.
+  apply support_sub.
+  apply support_set_disc.
+Qed.
 
 
 (* equivariance *)
@@ -221,16 +230,25 @@ Lemma supp_disc {D : discType} : ∀ d : D, supp d = fset0.
 Definition equivariant {X Y} (f : X → Y)
   := ∀ π x, π ∙ (f x) = f (π ∙ x).
 
-Lemma idE {X} : equivariant (@id X).
+Lemma id_equi {X} : equivariant (@id X).
 Proof. done. Qed.
 
-Lemma compE {X Y Z} (f : Y → Z) (g : X → Y)
+Lemma comp_equi {X Y Z} (f : Y → Z) (g : X → Y)
   : equivariant f → equivariant g → equivariant (f \o g).
 Proof. intros Ef Eg π x. rewrite Ef Eg //. Qed.
 
-Lemma SomeE {X}
+Lemma Some_equi {X}
   : equivariant (@Some X).
 Proof. done. Qed.
+
+Lemma equi2 {X Y} π (f : X → Y) x :
+  (π ∙ f) (π ∙ x) = π ∙ f x.
+Proof.
+  unfold rename.
+  simpl.
+  rewrite renameK.
+  done.
+Qed.
 
 Lemma equi2_prove {X Y Z} (f : X → Y → Z)
   : (∀ π x y, π ∙ (f x y) = f (π ∙ x) (π ∙ y)) → equivariant f.
@@ -246,13 +264,10 @@ Lemma equi2_use {X Y Z} (f : X → Y → Z)
   : equivariant f → (∀ π x y, π ∙ (f x y) = f (π ∙ x) (π ∙ y)).
 Proof.
   intros equi π x y.
-  rewrite -equi.
-  rewrite -{1}(renameK π y).
-  done.
+  rewrite -equi -equi2 //.
 Qed.
 
-
-Lemma adjoin_disc_l {X Y : nomType} {D : discType} {f : X → Y → D} :
+Lemma adjoin_disc_l {X Y} {D : discType} {f : X → Y → D} :
   equivariant f → 
   ∀ π x y, f (π ∙ x) y = f x (π^-1 ∙ y).
 Proof.
@@ -261,7 +276,7 @@ Proof.
   rewrite -equi2_use // absorb //.
 Qed.
 
-Lemma adjoin_disc_r {X Y : nomType} {D : discType} {f : X → Y → D} :
+Lemma adjoin_disc_r {X Y} {D : discType} {f : X → Y → D} :
   equivariant f → 
   ∀ π x y, f x (π ∙ y) = f (π^-1 ∙ x) y.
 Proof.
@@ -270,7 +285,7 @@ Proof.
   rewrite -equi2_use // absorb //.
 Qed.
 
-Lemma equi_fun {X Y Z : nomType} {f : X → Y → Z} : equivariant (uncurry f) → equivariant f.
+Lemma equi_fun {X Y Z} {f : X → Y → Z} : equivariant (uncurry f) → equivariant f.
 Proof.
   intros H.
   apply equi2_prove.
@@ -280,7 +295,7 @@ Proof.
   apply H.
 Qed.
 
-Lemma equi_Prop {X : nomType} (f : X → Prop) : (∀ π x, f x → f (π ∙ x)) → equivariant f.
+Lemma equi_Prop {X} (f : X → Prop) : (∀ π x, f x → f (π ∙ x)) → equivariant f.
 Proof.
   intros H π x.
   rewrite absorb.
@@ -291,20 +306,20 @@ Proof.
   apply H, H'.
 Qed.
 
-Lemma eqE {X : nomType} : equivariant (@eq X).
+Lemma eq_equi {X} : equivariant (@eq X).
 Proof.
   apply equi_fun, equi_Prop.
   intros π [x x'].
   simpl => [->] //.
 Qed.
 
-Lemma support_setE {X : nomType} : equivariant (@support_set X).
+Lemma support_set_equi {X} : equivariant (@support_set X).
 Proof.
   apply equi_fun, equi_Prop.
   simpl => π [x F] //= H.
   intros τ H'.
   rewrite adjoin_disc_r.
-  2: apply eqE.
+  2: apply eq_equi.
   rewrite -2!rename_comp.
   rewrite H //.
   intros a H''.
@@ -315,7 +330,7 @@ Proof.
   apply mem_imfset, H''.
 Qed.
 
-Lemma equi_bool {X : nomType} {f : X → bool} : (∀ π x, f x → f (π ∙ x)) → equivariant f.
+Lemma equi_bool {X} {f : X → bool} : (∀ π x, f x → f (π ∙ x)) → equivariant f.
 Proof.
   intros H.
   intros π x.
@@ -329,7 +344,7 @@ Proof.
     by rewrite H in E.
 Qed.
 
-Lemma fsubsetE {X : nomOrdType} : @equivariant _ _ (@fsubset X).
+Lemma fsubset_equi {X : actionOrdType} : @equivariant _ _ (@fsubset X).
 Proof.
   apply equi_fun.
   apply equi_bool.
@@ -337,7 +352,7 @@ Proof.
   apply imfsetS, H.
 Qed.
 
-Lemma equi_fset {X} {Y : nomOrdType} {f : X → {fset Y}}
+Lemma equi_fset {X} {Y : actionOrdType} {f : X → {fset Y}}
   : (∀ π x, π ∙ f x :<=: f (π ∙ x))%fset → equivariant f.
 Proof.
   intros H π x.
@@ -346,16 +361,16 @@ Proof.
   specialize (H π^-1%fperm (π ∙ x)).
   rewrite renameK in H.
   rewrite -adjoin_disc_r // in H.
-  apply fsubsetE.
+  apply fsubset_equi.
 Qed.
 
-Lemma fsetUE {X : nomOrdType} : equivariant (@fsetU X).
+Lemma fsetU_equi {X : actionOrdType} : equivariant (@fsetU X).
 Proof.
   apply equi_fun => π //= [F G] //=.
   apply imfsetU.
 Qed.
 
-Lemma fsetIE {X : nomOrdType} : equivariant (@fsetI X).
+Lemma fsetI_equi {X : actionOrdType} : equivariant (@fsetI X).
 Proof.
   apply equi_fun => π //= [F G] //=.
   apply imfsetI.
@@ -363,7 +378,7 @@ Proof.
   rewrite -(renameK π x) -(renameK π y) H //.
 Qed.
 
-Lemma in_memE {X : nomOrdType} : equivariant (λ (x : X) (xs : {fset X}), x \in xs).
+Lemma in_mem_equi {X : actionOrdType} : equivariant (λ (x : X) (xs : {fset X}), x \in xs).
 Proof.
   apply equi_fun.
   apply equi_bool => π //= [x xs] //= H.
@@ -371,7 +386,7 @@ Proof.
   apply H.
 Qed.
 
-Lemma eq_opE {X : nomOrdType} : equivariant (@eq_op X).
+Lemma eq_op_equi {X : actionOrdType} : equivariant (@eq_op X).
 Proof.
   apply equi_fun.
   apply equi_bool => //= π [F G] //= H.
@@ -380,24 +395,24 @@ Proof.
   apply eq_refl.
 Qed.
 
-Lemma fdisjointE {X : nomOrdType} : equivariant (@fdisjoint X).
+Lemma fdisjoint_equi {X : actionOrdType} : equivariant (@fdisjoint X).
 Proof.
   apply equi_fun.
   apply equi_bool => //= π [F G] //= H.
   unfold fdisjoint.
-  rewrite -equi2_use; [| apply fsetIE ].
-  rewrite adjoin_disc_l; [| apply: eq_opE ].
+  rewrite -equi2_use; [| apply fsetI_equi ].
+  rewrite adjoin_disc_l; [| apply: eq_op_equi ].
   replace (_ ∙ fset0) with (@fset0 X); [| rewrite /rename //= imfset0 // ].
   apply H.
 Qed.
 
-Lemma suppE {X : suppType} : equivariant (@supp X).
+Lemma supp_equi {X : nomType} : equivariant (@supp X).
 Proof.
   apply equi_fset.
   intros π x.
-  rewrite adjoin_disc_l; [| apply fsubsetE ].
+  rewrite adjoin_disc_l; [| apply fsubset_equi ].
   apply support_sub.
-  rewrite -adjoin_disc_l; [| apply support_setE ].
+  rewrite -adjoin_disc_l; [| apply support_set_equi ].
   apply is_support.
 Qed.
 
@@ -407,9 +422,9 @@ Proof.
   rewrite 2!absorb //.
 Qed.
 
-Program Definition prod_HasFiniteSupport {X Y : suppType}
-  : HasFiniteSupport (prod X Y)
-  := HasFiniteSupport.Build _ (λ '(x, y), fsetU (supp x) (supp y)) _ _.
+Program Definition prod_IsNominal {X Y : nomType}
+  : IsNominal (prod X Y)
+  := IsNominal.Build _ (λ '(x, y), fsetU (supp x) (supp y)) _ _.
 Obligation 1.
   unfold rename; simpl.
   rewrite is_support ?is_support // => a H'.
@@ -425,23 +440,23 @@ Obligation 2.
   all: injection H => ? ?; by subst.
 Qed.
 
-HB.instance Definition _ {X Y : suppType} : HasFiniteSupport (prod X Y)
-  := prod_HasFiniteSupport.
+HB.instance Definition _ {X Y : nomType} : IsNominal (prod X Y)
+  := prod_IsNominal.
 
 
-
-Lemma fset1E' {X : nomOrdType} : equivariant (@fset1 X).
+Lemma fset1_equi {X : actionOrdType} : equivariant (@fset1 X).
 Proof.
+  apply equi_fset.
   intros π x.
-  apply eq_fset => x'.
-  rewrite in_fset1.
-  rewrite (adjoin_disc_r in_memE).
-  rewrite in_fset1.
-  rewrite adjoin_disc_r //.
-  apply eq_opE.
+  apply /fsubsetP => x'.
+  rewrite (adjoin_disc_r in_mem_equi).
+  rewrite 2!in_fset1.
+  move => /eqP H.
+  subst.
+  rewrite renameKV //.
 Qed.
 
-Lemma support_set_equi {X Y} {x : X} {F} {f : X → Y}
+Lemma equi_support_set {X Y} {x : X} {F} {f : X → Y}
   : equivariant f → support_set x F → support_set (f x) F.
 Proof.
   intros E S π a.
@@ -451,8 +466,8 @@ Proof.
 Qed.
 
 
-Program Definition seq_IsNominal {X : nomType} : IsNominal (seq X)
-  := IsNominal.Build _ (λ π xs, map (rename π) xs) _ _.
+Program Definition seq_HasAction {X} : HasAction (seq X)
+  := HasAction.Build _ (λ π xs, map (rename π) xs) _ _.
 Obligation 1.
   rewrite -{2}(map_id x).
   induction x => //=.
@@ -464,12 +479,12 @@ Obligation 2.
   rewrite IHx rename_comp //.
 Qed.
 
-HB.instance Definition _ {X : nomType} : IsNominal (seq X)
-  := seq_IsNominal.
+HB.instance Definition _ {X : actionType} : HasAction (seq X)
+  := seq_HasAction.
 
-Program Definition seq_HasFiniteSupport {X : suppType}
-  : HasFiniteSupport (seq X)
-  := HasFiniteSupport.Build _ (foldr fsetU fset0 \o map supp) _ _.
+Program Definition seq_IsNominal {X : nomType}
+  : IsNominal (seq X)
+  := IsNominal.Build _ (foldr fsetU fset0 \o map supp) _ _.
 Obligation 1.
   induction x => //=.
   change (π ∙ (a :: x)) with (π ∙ a :: π ∙ x).
@@ -495,10 +510,10 @@ Obligation 2.
     rewrite !H2 //.
 Qed.
 
-HB.instance Definition _ {X : suppType} : HasFiniteSupport (seq X)
-  := seq_HasFiniteSupport.
+HB.instance Definition _ {X : nomType} : IsNominal (seq X)
+  := seq_IsNominal.
 
-Lemma fsetE {X : nomOrdType} : @equivariant (seq X) _ fset.
+Lemma fset_equi {X : actionOrdType} : @equivariant (seq X) _ fset.
 Proof.
   intros π xs.
   rewrite /rename //= imfset_fset //.
@@ -526,7 +541,7 @@ Proof.
   rewrite fpermK //.
 Qed.
 
-Lemma eq_in_supp {X : suppType} {π π' : {fperm atom}} {x : X} :
+Lemma eq_in_supp {X : nomType} {π π' : {fperm atom}} {x : X} :
   {in supp x, π =1 π'} →
   π ∙ x = π' ∙ x.
 Proof.
@@ -534,24 +549,24 @@ Proof.
   apply is_support.
 Qed.
 
-Definition disj {X Y : suppType} (x : X) (y : Y) := fdisjoint (supp x) (supp y).
+Definition disj {X Y : nomType} (x : X) (y : Y) := fdisjoint (supp x) (supp y).
 
-Lemma disjE {X Y : suppType} : equivariant (@disj X Y).
+Lemma disj_equi {X Y : nomType} : equivariant (@disj X Y).
 Proof.
   apply equi_fun => π //= [x y] //=.
   unfold disj.
-  rewrite equi2_use; [| apply: fdisjointE ].
-  rewrite 2!suppE //.
+  rewrite equi2_use; [| apply: fdisjoint_equi ].
+  rewrite 2!supp_equi //.
 Qed.
 
-Definition subs {X Y : suppType} (x : X) (y : Y) := fsubset (supp x) (supp y).
+Definition subs {X Y : nomType} (x : X) (y : Y) := fsubset (supp x) (supp y).
 
-Lemma subsE {X Y : suppType} : equivariant (@subs X Y).
+Lemma subsE {X Y : nomType} : equivariant (@subs X Y).
 Proof.
   apply equi_fun => π //= [x y] //=.
   unfold subs.
-  rewrite equi2_use; [| apply: fsubsetE ].
-  rewrite 2!suppE //.
+  rewrite equi2_use; [| apply: fsubset_equi ].
+  rewrite 2!supp_equi //.
 Qed.
 
 
@@ -583,7 +598,7 @@ Proof.
   intros x y z [π H0] [π' H1]. exists (π' * π)%fperm. subst. apply rename_comp.
 Qed.
 
-Add Parametric Relation {X : nomType} : X alpha
+Add Parametric Relation {X : actionType} : X alpha
   reflexivity proved by alpha_1
   symmetry proved by alpha_2
   transitivity proved by alpha_3
