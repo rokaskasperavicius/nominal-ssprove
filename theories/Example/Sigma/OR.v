@@ -39,150 +39,129 @@ Import FsetSolve.
 
 Set Equations Transparent.
 
-Module SigmaOR.
+Module SigmaOR (GP : GroupParam).
+
+Module GT := GroupTheorems GP.
+Import GP GT.
 
 #[local] Open Scope package_scope.
 
-(* Some kind of dual bijection between three sets. Does it have an established name?
-   The operation is bijective either one of its arguments fixed.
-   Some of these equations can probably be derived and do not have to be assumed.
-*)
-Record map_params {left} {right} :=
-  { ch : finType
-  ; chPos : Positive #|ch|
-  ; toR : ∀ (c : ch) (cl : left.(Challenge)), right.(Challenge)
-  ; toL : ∀ (c : ch) (cr : right.(Challenge)), left.(Challenge)
-  ; toC : ∀ (cl : left.(Challenge)) (cr : right.(Challenge)), ch
-  ; toR_toC : ∀ cl cr, toR (toC cl cr) cl = cr
-  ; toL_toC : ∀ cl cr, toL (toC cl cr) cr = cl
-  ; toC_toR : ∀ c cl, toC cl (toR c cl) = c
-  ; toL_toR : ∀ c cl, toL c (toR c cl) = cl
-  ; toC_toL : ∀ c cr, toC (toL c cr) cr = c
-  ; toR_toL : ∀ c cr, toR c (toL c cr) = cr
-  }.
-
-#[export] Instance Positive_ch left right p : Positive #|@ch left right p|.
-Proof. apply chPos. Qed.
-
-Definition challenge_loc π : Location := (choiceChallenge π; 1%N).
-Definition response_loc π : Location := (choiceResponse π; 2%N).
+Definition challenge_loc p : Location := ('challenge p; 1%N).
+Definition response_loc p : Location := ('response p; 2%N).
 
 Definition Extra_locs_lr l r : {fset Location} :=
   fset [:: challenge_loc l ; response_loc l ; challenge_loc r ; response_loc r ].
 
+#[export] Instance Positive_exp : Positive #|exp|.
+Proof. apply /card_gt0P. by exists 0. Qed.
+
 Record or_params :=
   { left : raw_sigma
   ; right : raw_sigma
-  ; mapping : @map_params left right
+  ; left_challenge : 'challenge left = 'fin #|exp|
+  ; right_challenge : 'challenge right = 'fin #|exp|
   ; d1 : disj left.(locs) right.(locs)
   ; d2 : disj (Extra_locs_lr left right) left.(locs)
   ; d3 : disj (Extra_locs_lr left right) right.(locs)
   }.
 
-Implicit Type (π : or_params).
+Implicit Type (p : or_params).
 
-Definition Extra_locs π : {fset Location} :=
-  Extra_locs_lr π.(left) π.(right).
+Definition Extra_locs p : {fset Location} :=
+  Extra_locs_lr p.(left) p.(right).
 
-Definition i_lwitness π := #| π.(left).(Witness) |.
-Definition i_rwitness π := #| π.(right).(Witness) |.
-Definition i_lchallenge π := #| π.(left).(Challenge) |.
-Definition i_rchallenge π := #| π.(right).(Challenge) |.
+Definition pad p : 'fin #|exp| → 'challenge p.(left) → 'challenge p.(right).
+Proof.
+  rewrite p.(left_challenge) p.(right_challenge) => c c1.
+  exact (fto (otf c1 + otf c)).
+Defined.
 
-#[export] Instance Positive_prod_finType {A B : finType} :
-  Positive #|A| → Positive #|B| → Positive #|Casts.prod_finType A B|.
-Proof. rewrite card_prod. apply Positive_prod. Qed.
+Definition unpad p : 'fin #|exp| → 'challenge p.(right) → 'challenge p.(left).
+Proof.
+  rewrite p.(left_challenge) p.(right_challenge) => c c2.
+  exact (fto (otf c2 - otf c)).
+Defined.
 
-#[export] Instance Positive_sum_finType_l {A B : finType} :
-  Positive #|A| → Positive #|(Datatypes.sum A B : finType)|.
-Proof. rewrite card_sum. apply ltn_addr. Qed.
+Definition into {T S : choice_type} (H : S = T) : T → S.
+Proof. rewrite H. exact id. Defined.
 
 #[global] Hint Unfold Extra_locs Extra_locs_lr : in_fset_eq.
 
-Equations raw_or π : raw_sigma :=
-  raw_or π :=
-  {| Statement := prod π.(left).(Statement) π.(right).(Statement)
-   ; Witness := Datatypes.sum π.(left).(Witness) π.(right).(Witness)
-   ; Message := prod π.(left).(Message) π.(right).(Message)
-   ; Challenge := π.(mapping).(ch)
-   ; Response := prod (prod (prod π.(left).(Challenge) π.(left).(Response))
-      π.(right).(Challenge)) π.(right).(Response)
+Equations raw_or p : raw_sigma :=
+  raw_or p :=
+  {| Statement := 'statement p.(left) × 'statement p.(right)
+   ; Witness := 'bool × ('witness p.(left) × 'witness p.(right))
+   ; Message := 'message p.(left) × 'message p.(right)
+   ; Challenge := 'fin #|exp|
+   ; Response :=
+       (('challenge p.(left) × 'response p.(left))
+       × 'challenge p.(right)) × 'response p.(right)
 
    ; locs :=
-      Extra_locs π
-        :|: π.(left).(locs)
-        :|: π.(right).(locs)
-   ; R := λ h w,
-      match w with
-      | inl w1 => π.(left).(R) h.1 w1
-      | inr w2 => π.(right).(R) h.2 w2
-      end
-   ; commit := λ h w,
+       Extra_locs p
+         :|: p.(left).(locs)
+         :|: p.(right).(locs)
+
+   ; R := λ '(h1, h2) '(wb, (w1, w2)),
+       if wb then p.(left).(R) h1 w1 else p.(right).(R) h2 w2
+
+   ; commit := λ '(h1, h2) '(wb, (w1, w2)),
       {code
-        let (hl, hr) := h in
-        match w with
-        | inl wl =>
-          R1 ← π.(left).(commit) hl wl ;;
-          cr ← sample uniform (i_rchallenge π) ;;
-          '(_, R2, _, s2) ← π.(right).(simulate) hr (otf cr) ;;
-          #put challenge_loc π.(right)  := cr ;; (* Use c2 or cr? *)
-          #put response_loc π.(right) := fto s2 ;;
+        if wb then
+          R1 ← p.(left).(commit) h1 w1 ;;
+          c2 ← sample uniform #|exp| ;;
+          let c2 := into p.(right_challenge) c2 in
+          '(R2, s2) ← p.(right).(simulate) h2 c2 ;;
+          #put challenge_loc p.(right) := c2 ;; (* Use c2 or cr? *)
+          #put response_loc p.(right) := s2 ;;
           ret (R1, R2)
-        | inr wr =>
-          R2 ← π.(right).(commit) hr wr ;;
-          cl ← sample uniform (i_lchallenge π) ;;
-          '(_, R1, _, s1) ← π.(left).(simulate) hl (otf cl) ;;
-          #put challenge_loc π.(left) := cl ;;
-          #put response_loc π.(left) := fto s1 ;;
+        else
+          R2 ← p.(right).(commit) h2 w2 ;;
+          c1 ← sample uniform #|exp| ;;
+          let c1 := into p.(left_challenge) c1 in
+          '(R1, s1) ← p.(left).(simulate) h1 c1 ;;
+          #put challenge_loc p.(left) := c1 ;;
+          #put response_loc p.(left) := s1 ;;
           ret (R1, R2)
-        end
       }
-   ; response := λ h w a c,
+   ; response := λ '(h1, h2) '(wb, (w1, w2)) '(a1, a2) c,
       {code
-        let (hl, hr) := h in
-        let (al, ar) := a in
-        match w with
-        | inl wl =>
-          c2 ← get challenge_loc π.(right) ;;
-          s2 ← get response_loc π.(right) ;;
-          let c1 := π.(mapping).(toL) c (otf c2) in
-          s1 ← π.(left).(response) hl wl al c1 ;;
-          ret (c1, s1, otf c2, otf s2)
-        | inr wr =>
-          c1 ← get challenge_loc π.(left) ;;
-          s1 ← get response_loc π.(left) ;;
-          let c2 := π.(mapping).(toR) c (otf c1) in
-          s2 ← π.(right).(response) hr wr ar c2 ;;
-          ret (otf c1, otf s1, c2, s2)
-        end
+        if wb then
+          c2 ← get challenge_loc p.(right) ;;
+          s2 ← get response_loc p.(right) ;;
+          let c1 := unpad p c c2 in
+          s1 ← p.(left).(response) h1 w1 a1 c1 ;;
+          ret (c1, s1, c2, s2)
+        else
+          c1 ← get challenge_loc p.(left) ;;
+          s1 ← get response_loc p.(left) ;;
+          let c2 := pad p c c1 in
+          s2 ← p.(right).(response) h2 w2 a2 c2 ;;
+          ret (c1, s1, c2, s2)
       }
-   ; simulate := λ h c,
+   ; simulate := λ '(h1, h2) c,
      {code
-       let (hl, hr) := h in
-       c1 ← sample (@uniform (i_lchallenge π) _) ;;
-       let c2 := π.(mapping).(toR) c (otf c1) in
-       '(_, R1, _, s1) ← π.(left).(simulate) hl (otf c1) ;;
-       '(_, R2, _, s2) ← π.(right).(simulate) hr c2 ;;
-       ret ((hl, hr), (R1, R2), c, (otf c1, s1, c2, s2))
+       c1 ← sample uniform #|exp| ;;
+       let c1 := into p.(left_challenge) c1 in
+       let c2 := pad p c c1 in
+       '(R1, s1) ← p.(left).(simulate) h1 c1 ;;
+       '(R2, s2) ← p.(right).(simulate) h2 c2 ;;
+       ret ((R1, R2), (c1, s1, c2, s2))
      }
-   ; verify := λ h R c z,
-      let (hl, hr) := h in
-      let (Rl, Rr) := R in
+   ; verify := λ '(h1, h2) '(R1, R2) c z,
       let '(c1, s1, c2, s2) := z in
-        π.(left).(verify) hl Rl c1 s1
-        && π.(right).(verify) hr Rr c2 s2
-        && (π.(mapping).(toR) c c1 == c2)
-   ; extractor := λ h R e e' z z',
-      let '(h1, h2) := h in
-      let '(R1, R2) := R in
+        p.(left).(verify) h1 R1 c1 s1
+        && p.(right).(verify) h2 R2 c2 s2
+        && (pad p c c1 == c2)
+   ; extractor := λ '(h1, h2) '(R1, R2) e e' z z',
       let '(c1, s1, c2, s2) := z in
       let '(c1', s1', c2', s2') := z' in
       if c1 != c1' then
-        omap inl
-          (π.(left).(extractor) h1 R1 c1 c1' s1 s1')
+        omap (λ w1 : 'witness p.(left), (true, (w1, @chCanonical p.(right).(Witness))))
+          (p.(left).(extractor) h1 R1 c1 c1' s1 s1')
       else
-        omap inr 
-          (π.(right).(extractor) h2 R2 c2 c2' s2 s2')
+        omap (λ w2 : 'witness p.(right), (false, (@chCanonical p.(left).(Witness), w2)))
+          (p.(right).(extractor) h2 R2 c2 c2' s2 s2')
   |}.
   Obligation 1.
     ssprove_valid.
@@ -194,19 +173,6 @@ Equations raw_or π : raw_sigma :=
     3,6: eapply valid_injectLocations; [| apply prog_valid ].
     all: try fset_solve.
   Qed.
-
-
-#[local] Definition fto_toL_otf π (c : π.(mapping).(ch)) :
-  Arit (uniform (i_rchallenge π)) →
-  Arit (uniform (i_lchallenge π)) :=
-  λ cr, fto (π.(mapping).(toL) c (otf cr)).
-
-Lemma toL_bij π c : bijective (fto_toL_otf π c).
-Proof.
-  unfold fto_toL_otf.
-  exists (λ cl, fto (π.(mapping).(toR) c (otf cl))).
-  all: intro y; rewrite otf_fto ?toL_toR ?toR_toL; apply fto_otf.
-Qed.
 
 
 Definition Aux n m S T :=
@@ -225,52 +191,49 @@ Definition Aux n m S T :=
 Definition LEFT := 0%N.
 Definition RIGHT := 1%N.
 
-Definition AuxL π :=
+Definition AuxL p :=
   (Aux LEFT TRANSCRIPT
-    (choiceInput π.(left))
-    (choiceTranscript π.(left) )
+    (chInput p.(left))
+    (chTranscript p.(left) )
   ).
 
-Definition AuxR π :=
+Definition AuxR p :=
   (Aux RIGHT TRANSCRIPT
-    (choiceInput π.(right))
-    (choiceTranscript π.(right))
+    (chInput p.(right))
+    (chTranscript p.(right))
   ).
 
-Definition IF π : Interface :=
+Definition IF p : Interface :=
   [interface
-     #val #[ LEFT ] : (chInput π.(left)) → chTranscript π.(left) ;
-     #val #[ RIGHT ] : (chInput π.(right)) → chTranscript π.(right)
+     #val #[ LEFT ] : ('input p.(left)) → 'transcript p.(left) ;
+     #val #[ RIGHT ] : ('input p.(right)) → 'transcript p.(right)
   ].
 #[global] Hint Unfold IF : in_fset_eq.
 
-Definition SHVZK_call_raw π (hwe : choiceInput (raw_or π)) :
-  raw_code (choiceTranscript (raw_or π))
+Definition SHVZK_call_raw p (hwe : chInput (raw_or p)) :
+  raw_code (chTranscript (raw_or p))
   :=
     #import {sig #[ LEFT ] :
-      (chInput π.(left)) → chTranscript π.(left)} as LeftTranscript ;;
+      ('input p.(left)) → 'transcript p.(left)} as LeftTranscript ;;
     #import {sig #[ RIGHT ] :
-      (chInput π.(right)) → chTranscript π.(right)} as RightTranscript ;;
+      ('input p.(right)) → 'transcript p.(right)} as RightTranscript ;;
 
     let '(h, w, c) := hwe in
-    let '(hl, hr) := otf h in
-    c1 ← sample uniform (i_lchallenge π) ;;
-    let c2 := π.(mapping).(toR) (otf c) (otf c1) in
-    '(_, R1, _, s1) ←
-      match otf w with
-      | inl wl => LeftTranscript (fto hl, fto wl, c1)
-      | inr wr => '(a, R1, b, s1) ← (π.(left).(simulate) hl (otf c1)) ;;
-                  ret (fto a, fto R1, fto b, fto s1)
-      end ;;
-    '(_, R2, _, s2) ←
-      match otf w with
-      | inl wl => '(a, R2, b, s2) ← π.(right).(simulate) hr c2 ;;
-                  ret (fto a, fto R2, fto b, fto s2)
-      | inr wr => RightTranscript (fto hr, fto wr, fto c2)
-      end ;;
-    ret (fto (hl, hr), fto (otf R1, otf R2), c, fto (otf c1, otf s1, c2, otf s2)).
+    let '(h1, h2) := h in
+    let '(wb, (w1, w2)) := w in
+    c1 ← sample uniform #|exp| ;;
+    let c1 := into p.(left_challenge) c1 in
+    let c2 := pad p c c1 in
+    if wb then
+      '(_, R1, _, s1) ← LeftTranscript (h1, w1, c1) ;;
+      '(R2, s2) ← p.(right).(simulate) h2 c2 ;;
+      ret ((h1, h2), (R1, R2), c, (c1, s1, c2, s2))
+    else
+      '(R1, s1) ← p.(left).(simulate) h1 c1 ;;
+      '(_, R2, _, s2) ← RightTranscript (h2, w2, c2) ;;
+      ret ((h1, h2), (R1, R2), c, (c1, s1, c2, s2)).
 
-#[local] Instance SHVZK_call_proof π : ∀ hwe, ValidCode (fset [::]) (IF π) (SHVZK_call_raw π hwe).
+#[local] Instance SHVZK_call_proof p : ∀ hwe, ValidCode (fset [::]) (IF p) (SHVZK_call_raw p hwe).
 Proof.
   intros hwe.
   unfold SHVZK_call_raw, IF.
@@ -280,18 +243,18 @@ Proof.
   1,2: simpl; fset_solve.
 Qed.
 
-Definition SHVZK_call π :
-  trimmed_package (fset [::]) (IF π)
-    [interface #val #[ TRANSCRIPT ] : (chInput (raw_or π)) → chTranscript (raw_or π)]
+Definition SHVZK_call p :
+  trimmed_package (fset [::]) (IF p)
+    [interface #val #[ TRANSCRIPT ] : ('input (raw_or p)) → 'transcript (raw_or p)]
   := [trimmed_package
-    #def #[ TRANSCRIPT ] (hwe : chInput (raw_or π)) : (chTranscript (raw_or π)) { SHVZK_call_raw π hwe }
+    #def #[ TRANSCRIPT ] (hwe : 'input (raw_or p)) : ('transcript (raw_or p)) { SHVZK_call_raw p hwe }
   ].
 
 
-Definition CALL π (L R : nom_package) :=
-  nom_link (SHVZK_call π) (nom_par
-    (nom_link (AuxL π) L)
-    (nom_link (AuxR π) R)
+Definition CALL p (L R : nom_package) :=
+  nom_link (SHVZK_call p) (nom_par
+    (nom_link (AuxL p) L)
+    (nom_link (AuxR p) R)
   ).
 
 Lemma domm_link {P Q} : domm (link P Q) = domm P.
@@ -299,12 +262,12 @@ Proof. apply domm_map. Qed.
 
 Hint Rewrite domm_set domm0 @domm_link : in_fset_eq.
 
-#[local] Instance call_valid π :
+#[local] Instance call_valid p :
   ∀ (L R : nom_package),
-    ValidPackage L.(loc) [interface] (Transcript π.(left)) L →
-    ValidPackage R.(loc) [interface] (Transcript π.(right)) R →
-    ValidPackage (CALL π L R).(loc) [interface] (Transcript (raw_or π))
-      (CALL π L R).
+    ValidPackage L.(loc) [interface] (Transcript p.(left)) L →
+    ValidPackage R.(loc) [interface] (Transcript p.(right)) R →
+    ValidPackage (CALL p L R).(loc) [interface] (Transcript (raw_or p))
+      (CALL p L R).
 Proof.
   move => L R VL VR.
   unfold CALL.
@@ -318,12 +281,12 @@ Proof.
   by simpl.
 Qed.
 
-Definition call_real_real π
-  := CALL π (SHVZK_real π.(left)) (SHVZK_real π.(right)).
-Definition call_ideal_real π
-  := CALL π (SHVZK_ideal π.(left)) (SHVZK_real π.(right)).
-Definition call_ideal_ideal π
-  := CALL π (SHVZK_ideal π.(left)) (SHVZK_ideal π.(right)).
+Definition call_real_real p
+  := CALL p (SHVZK_real p.(left)) (SHVZK_real p.(right)).
+Definition call_ideal_real p
+  := CALL p (SHVZK_ideal p.(left)) (SHVZK_real p.(right)).
+Definition call_ideal_ideal p
+  := CALL p (SHVZK_ideal p.(left)) (SHVZK_ideal p.(right)).
 
 Lemma invariant_ignore_extra p :
   Invariant (SHVZK_real (raw_or p)).(loc)
@@ -337,76 +300,84 @@ Qed.
 
 Hint Rewrite in_fset : in_fset_eq.
 
-Lemma commit_call π :
-    SHVZK_real (raw_or π) ≈₀ call_real_real π.
+Definition iso p (c : 'fin #|exp|) : Arit (uniform #|exp|) → Arit (uniform #|exp|)
+  := λ c2, fto (otf c2 - otf c).
+
+Lemma into_iso p c c2
+  : into p.(left_challenge) (iso p c c2) = unpad p c (into p.(right_challenge) c2).
+Proof.
+  unfold into, unpad, iso, eq_rect_r.
+  move: (Logic.eq_sym p.(left_challenge)) (Logic.eq_sym p.(right_challenge)).
+  rewrite p.(left_challenge) p.(right_challenge) => H1 H2.
+  rewrite -4!Eqdep.EqdepTheory.eq_rect_eq //.
+Qed.
+
+Lemma pad_unpad p c c2 : pad p c (unpad p c c2) = c2.
+Proof.
+  unfold pad, unpad, eq_rect_r.
+  move: c2 (Logic.eq_sym p.(left_challenge)) (Logic.eq_sym p.(right_challenge)).
+  rewrite p.(left_challenge) p.(right_challenge) => c2 H1 H2.
+  rewrite -4!Eqdep.EqdepTheory.eq_rect_eq.
+  rewrite otf_fto addrNK fto_otf //.
+Qed.
+
+Lemma iso_bij p c : bijective (iso p c).
+Proof.
+  unfold iso.
+  exists (λ c1, fto (otf c1 + otf c)) => [c2|c1].
+  + rewrite otf_fto addrNK fto_otf //.
+  + rewrite otf_fto addrK fto_otf //.
+Qed.
+
+Lemma commit_call p :
+    SHVZK_real (raw_or p) ≈₀ call_real_real p.
 Proof.
   eapply eq_rel_perf_ind.
   1: apply invariant_ignore_extra.
   simplify_eq_rel hwe.
   unfold SHVZK_call_raw.
-  destruct hwe as [[h w] e].
-  ssprove_code_simpl; simpl.
-  rewrite !cast_fun_K.
-  rewrite -(fto_otf h).
-  move: (otf h) => [hl hr] {h}.
-  rewrite 3!otf_fto.
-  move: (otf w) => [wl|wr] {w}.
+  destruct hwe as [[[h1 h2] [[] [w1 w2]]] c].
+  1,2: ssprove_code_simpl; simpl.
+  1,2: simplify_linking.
+  1,2: ssprove_code_simpl; simpl.
+  1,2: rewrite !cast_fun_K.
+  1,2: ssprove_code_simpl; simpl.
   + ssprove_swap_lhs 1%N.
     ssprove_swap_lhs 0%N.
-    eapply r_uniform_bij with (1 := toL_bij π (otf e)) => cr.
-    rewrite 2!bind_assoc.
+    eapply r_uniform_bij with (1 := iso_bij p c) => c2.
+    rewrite into_iso pad_unpad.
+    move: (into p.(right_challenge) c2) => {}c2.
     ssprove_code_simpl_more.
-    rewrite //= otf_fto.
     ssprove_sync => H.
     ssprove_code_simpl; simpl.
     rewrite @code_link_scheme. 
-    apply r_bind_eq.
-    1: {
-      eapply r_reflexivity_alt; [ apply prog_valid | |]; intros.
-      1: apply get_pre_cond_heap_ignore.
-      2: apply put_pre_cond_heap_ignore.
-      apply /fdisjointP; [| eassumption ].
-      rewrite fdisjointC.
-      apply supp_fdisjoint, (d2 π).
-    }
+    apply rsame_head_ignore_prog.
+    1: rewrite fdisjointC; apply supp_fdisjoint, p.(d2).
     move => a.
     eapply rel_jdg_replace_sem_r; simpl.
     2: eapply swap_code.
     3,4: apply prog_valid.
     2: fset_solve.
-    rewrite /fto_toL_otf otf_fto toR_toL.
-    apply r_bind_eq.
-    1: {
-      eapply r_reflexivity_alt; [ apply prog_valid | |];
-        intros; exfalso; fset_solve.
-    }
-    intros [[[_ R1] _] s1].
+    apply rsame_head_ignore_prog; [ fset_solve |].
+    intros [R1 s1].
     ssprove_swap_lhs 1%N.
     ssprove_contract_put_get_lhs.
     apply r_put_lhs.
     ssprove_contract_put_get_lhs.
     apply r_put_lhs.
     ssprove_restore_pre; [ ssprove_invariant |].
-    apply r_bind_eq.
-    1: {
-      eapply r_reflexivity_alt; [ apply prog_valid | |]; intros.
-      1: apply get_pre_cond_heap_ignore.
-      2: apply put_pre_cond_heap_ignore.
-      apply /fdisjointP; [| eassumption ].
-      rewrite fdisjointC.
-      apply supp_fdisjoint, (d2 π).
-    }
+    apply rsame_head_ignore_prog.
+    1: rewrite fdisjointC; apply supp_fdisjoint, p.(d2).
     intros s2.
-    rewrite !otf_fto.
     by apply r_ret.
   + ssprove_swap_lhs 1%N.
     ssprove_swap_lhs 0%N.
-    ssprove_sync => cl.
+    ssprove_sync => c1.
     rewrite code_link_scheme.
     eapply rel_jdg_replace_sem_r; simpl.
     2: {
       eapply rsame_head => x.
-      rewrite 3!destruct_let_pair 2!bind_assoc.
+      rewrite destruct_let_pair.
       eapply rreflexivity_rule.
     }
     eapply rel_jdg_replace_sem_r; simpl.
@@ -416,17 +387,9 @@ Proof.
     2: fset_solve.
     ssprove_code_simpl_more.
     ssprove_code_simpl; simpl.
-    rewrite otf_fto.
     ssprove_sync => H.
-    apply r_bind_eq.
-    1: {
-      eapply r_reflexivity_alt; [ apply prog_valid | |]; intros.
-      1: apply get_pre_cond_heap_ignore.
-      2: apply put_pre_cond_heap_ignore.
-      apply /fdisjointP; [| eassumption ].
-      rewrite fdisjointC.
-      apply supp_fdisjoint, (d3 π).
-    }
+    apply rsame_head_ignore_prog.
+    1: rewrite fdisjointC; apply supp_fdisjoint, p.(d3).
     move => vr. 
 
     eapply rel_jdg_replace_sem_r; simpl.
@@ -434,30 +397,17 @@ Proof.
     3,4: apply prog_valid.
     2: fset_solve.
 
-    apply r_bind_eq.
-    1: {
-      eapply r_reflexivity_alt; [ apply prog_valid | |];
-        intros; exfalso; fset_solve.
-    }
-    intros [[[h1 R1] z1] s1].
+    apply rsame_head_ignore_prog; [ fset_solve |].
+    intros [R1 z1].
     ssprove_swap_lhs 1%N.
     ssprove_contract_put_get_lhs.
     apply r_put_lhs.
     ssprove_contract_put_get_lhs.
     apply r_put_lhs.
     ssprove_restore_pre; [ ssprove_invariant |].
-    apply r_bind_eq.
-    1: {
-      rewrite otf_fto.
-      eapply r_reflexivity_alt; [ apply prog_valid | |]; intros.
-      1: apply get_pre_cond_heap_ignore.
-      2: apply put_pre_cond_heap_ignore.
-      apply /fdisjointP; [| eassumption ].
-      rewrite fdisjointC.
-      apply supp_fdisjoint, (d3 π).
-    }
+    apply rsame_head_ignore_prog.
+    1: rewrite fdisjointC; apply supp_fdisjoint, p.(d3).
     intros s2.
-    rewrite !otf_fto.
     by apply r_ret.
 Qed.
 
@@ -468,43 +418,48 @@ Proof.
   apply eq_rel_perf_ind_eq.
   simplify_eq_rel hwe.
   unfold SHVZK_call_raw.
-  move: hwe => [[h w] c].
-  move: (otf h) (otf w) => [hl hr] {h} [wl|wr] {w}.
-  1-2: simplify_linking; ssprove_code_simpl; simpl.
-  1-2: ssprove_swap_rhs 0%N; ssprove_sync_eq => cl.
-  1-2: rewrite !cast_fun_K bind_ret !otf_fto.
+  destruct hwe as [[[h1 h2] [[] [w1 w2]]] c].
+  1,2: ssprove_code_simpl; simpl.
+  1,2: simplify_linking.
+  1,2: ssprove_code_simpl; simpl.
+  1,2: rewrite !cast_fun_K.
+  1,2: ssprove_code_simpl; simpl.
+  1,2: ssprove_swap_rhs 0%N; ssprove_sync_eq => cl.
   + ssprove_code_simpl_more.
     ssprove_sync => P.
     rewrite code_link_scheme.
     ssprove_code_simpl.
     eapply rsame_head => t1.
-    move: t1 => [[[l1 l2] l3] l4].
+    move: t1 => [l1 l2].
     eapply rsame_head => t2.
-    move: t2 => [[[r1 r2] r3] r4].
-    rewrite !fto_otf !otf_fto.
+    move: t2 => [r1 r2].
     by eapply r_ret.
 
   + rewrite code_link_scheme.
-    move: (p.(right).(R) hr wr) => [].
-    2: {
-      eapply rel_jdg_replace_sem_l.
-      2: eapply rel_jdg_replace_r.
-      3: do 3 setoid_rewrite destruct_let_pair; reflexivity.
-      2: eapply swap_code.
-      3,4: ssprove_valid; apply prog_valid.
-      2: fset_solve.
-      ssprove_code_simpl_more; simpl.
-      apply r_fail.
-    }
+    eapply rel_jdg_replace_sem_l.
+    2: eapply rel_jdg_replace_r.
+    3: setoid_rewrite destruct_let_pair; reflexivity.
+    2: eapply swap_code.
+    3,4: ssprove_valid; apply prog_valid.
+    2: fset_solve.
+    ssprove_code_simpl_more.
+    ssprove_sync => H.
     ssprove_code_simpl; simpl.
+    move: (into p.(left_challenge) cl) => {}cl.
+
+    eapply rel_jdg_replace_sem_l.
+    2: eapply rel_jdg_replace_r.
+    3: setoid_rewrite destruct_let_pair; reflexivity.
+    2: eapply swap_code.
+    3,4: ssprove_valid; apply prog_valid.
+    2: fset_solve.
+
     eapply rsame_head => t1.
-    move: t1 => [[[l1 l2] l3] l4].
+    move: t1 => [l1 l2].
     eapply rsame_head => t2.
-    move: t2 => [[[r1 r2] r3] r4].
-    rewrite !fto_otf !otf_fto.
+    move: t2 => [r1 r2].
     by eapply r_ret.
 Qed.
-
 
 Lemma rew_notin : forall (T : ordType) (x : T) (s : {fset T}), x \notin s = ~~ (x \in s).
 Proof. reflexivity. Qed.
@@ -545,17 +500,16 @@ Proof.
   erewrite (AdvantageD_perf_l (commit_call p)).
   erewrite <- (AdvantageD_perf_r (simulate_call p)).
 
-  move: (d1 p) (d2 p) (d3 p) => H1 H2 H3.
-
   unfold call_real_real, call_ideal_ideal, CALL.
   repeat (rewrite nom_link_dlink || rewrite nom_par_dpar).
-  2-9: move: H1; unfold disj; fset_solve.
+  2-9: move: (d1 p); unfold disj; fset_solve.
 
   advantage_trans (call_ideal_real p).
+
   apply lerD.
   1,2: unfold call_ideal_real, CALL.
   1,2: repeat (rewrite nom_link_dlink || rewrite nom_par_dpar).
-  2-5,7-10: move: H2 H3; unfold disj; try fset_solve.
+  2-5,7-10: move: (d2 p) (d3 p); unfold disj; try fset_solve.
   + rewrite AdvantageD_dlink.
     erewrite -> AdvantageD_dpar_l.
     2-8: try dprove_valid.
