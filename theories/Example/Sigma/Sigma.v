@@ -118,7 +118,7 @@ Definition Correct_real p :
   trimmed_package p.(locs) Game_import (Correct p) :=
   [trimmed_package
     #def #[ RUN ] ('(h, w, e) : ('statement p × 'witness p) × 'challenge p) : 'bool {
-      #assert (p.(R) h w) ;;
+      #assert p.(R) h w ;;
       a ← p.(commit) h w ;;
       z ← p.(response) h w a e ;;
       @ret 'bool (p.(verify) h a e z)
@@ -129,7 +129,7 @@ Definition Correct_ideal p :
   trimmed_package fset0 Game_import (Correct p) :=
   [trimmed_package
     #def #[ RUN ] ('(h, w, e) : ('statement p × 'witness p) × 'challenge p) : 'bool {
-      #assert (p.(R) h w) ;;
+      #assert p.(R) h w ;;
       @ret 'bool true
     }
   ].
@@ -164,7 +164,7 @@ Definition SHVZK_real p :
   trimmed_package p.(locs) Game_import (Transcript p) :=
   [trimmed_package
     #def #[ TRANSCRIPT ] ('(h, w, e) : 'input p) : ('transcript p) {
-      #assert (p.(R) h w) ;;
+      #assert p.(R) h w ;;
       a ← p.(commit) h w ;;
       z ← p.(response) h w a e ;;
       @ret (chTranscript p) (h, a, e, z)
@@ -175,7 +175,7 @@ Definition SHVZK_ideal p :
   trimmed_package fset0 Game_import (Transcript p) :=
   [trimmed_package
     #def #[ TRANSCRIPT ] ('(h, w, e) : 'input p) : ('transcript p) {
-      #assert (p.(R) h w) ;;
+      #assert p.(R) h w ;;
       '(a, z) ← p.(simulate) h e ;;
       @ret (chTranscript p) (h, a, e, z)
     }
@@ -203,31 +203,26 @@ Notation " 'soundness p " :=
 Notation Soundness p :=
   [interface #val #[ SOUNDNESS ] : ('soundness p) → 'bool ].
 
-(*
 Definition Special_Soundness_f p :
   trimmed_package fset0 Game_import (Soundness p) :=
   [trimmed_package
-    #def #[ SOUNDNESS ] (arg : 'soundness p) : 'bool {
-      let '((h, a), ((e, z), (e', z'))) := arg in
-      let v1 := p.(verify) h a e z in
-      let v2 := p.(verify) h a e' z' in
-      if [&& (e != e') , v1 & v2 ] then
-        match p.(extractor) (otf h) (otf a) (otf e) (otf e') (otf z) (otf z') with
-        | Some w => ret (p.(R) (otf h) w)
-        | None => ret false
-        end
-      else ret false
+    #def #[ SOUNDNESS ] ('((h, a), ((e, z), (e', z'))) : 'soundness p) : 'bool {
+      #assert p.(verify) h a e z ;;
+      #assert p.(verify) h a e' z' ;;
+      #assert (e != e') ;;
+      let ow := p.(extractor) h a e e' z z' in
+      @ret 'bool (if ow is Some w then p.(R) h w else false)
     }
   ].
 
 Definition Special_Soundness_t p :
   trimmed_package fset0 Game_import (Soundness p) :=
   [trimmed_package
-    #def #[ SOUNDNESS ] (t : chSoundness p) : 'bool {
-      let '(h, (a, ((e, z), (e', z')))) := t in
-      let v1 := p.(verify) (otf h) (otf a) (otf e) (otf z) in
-      let v2 := p.(verify) (otf h) (otf a) (otf e') (otf z') in
-      ret [&& (e != e') , v1 & v2 ]
+    #def #[ SOUNDNESS ] ('((h, a), ((e, z), (e', z'))) : 'soundness p) : 'bool {
+      #assert p.(verify) h a e z ;;
+      #assert p.(verify) h a e' z' ;;
+      #assert (e != e') ;;
+      @ret 'bool true
     }
   ].
 
@@ -235,8 +230,7 @@ Definition Special_Soundness p b :=
   if b then Special_Soundness_t p : nom_package else Special_Soundness_f p.
 
 (* Main security statement for 2-special soundness. *)
-Definition TwoSpecialSoundness p ε :=
+Definition Adv_Special_Soundness p ε :=
   ∀ (A : nom_package),
   ValidPackage (loc A) (Soundness p) A_export A →
   AdvantageP (Special_Soundness p) A <= ε A.
- *)

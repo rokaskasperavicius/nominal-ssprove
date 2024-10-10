@@ -13,7 +13,5 @@ theories/Example/NomKEMDEM.v
 
 theories/Example/Sigma/Group.v
 theories/Example/Sigma/Sigma.v
+theories/Example/Sigma/Schnorr.v
 theories/Example/Sigma/OR.v
-
-
-
