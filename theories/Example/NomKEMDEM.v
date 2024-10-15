@@ -634,7 +634,7 @@ Section KEMDEM.
     intros LD₀ LK₀ CK₀ CK₁ CD₀ CD₁ EK ED A K₀ K₁ D₀ D₁.
     intros.
     advantage_trans (dlink (dpar CK₁ CD₁) KEY).
-    eapply ler_add.
+    eapply lerD.
     - eapply single_key_a. all: eauto.
     (* De-idealising the core keying package *)
     - erewrite AdvantageD_sym.

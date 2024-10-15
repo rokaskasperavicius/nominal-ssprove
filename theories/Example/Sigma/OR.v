@@ -166,12 +166,12 @@ Equations raw_or p : raw_sigma :=
   Obligation 1.
     ssprove_valid.
     1,2,5,6: eapply valid_injectLocations; [| apply prog_valid ].
-    all: try fset_solve.
+    all: fset_solve.
   Qed.
   Obligation 2.
     ssprove_valid.
     3,6: eapply valid_injectLocations; [| apply prog_valid ].
-    all: try fset_solve.
+    all: fset_solve.
   Qed.
 
 
@@ -237,10 +237,7 @@ Definition SHVZK_call_raw p (hwe : chInput (raw_or p)) :
 Proof.
   intros hwe.
   unfold SHVZK_call_raw, IF.
-  ssprove_valid.
-  1,2: eapply valid_injectMap; [ apply fsub0set | rewrite fset0E ]; ssprove_valid.
-  1,2: eapply valid_injectLocations; [| apply prog_valid ].
-  1,2: simpl; fset_solve.
+  ssprove_valid; apply valid_scheme, prog_valid.
 Qed.
 
 Definition SHVZK_call p :
@@ -511,31 +508,20 @@ Proof.
   1,2: repeat (rewrite nom_link_dlink || rewrite nom_par_dpar).
   2-5,7-10: move: (d2 p) (d3 p); unfold disj; try fset_solve.
   + rewrite AdvantageD_dlink.
-    erewrite -> AdvantageD_dpar_l.
-    2-8: try dprove_valid.
-    2:{ rewrite /idents fset_cons -fset0E fsetU0 imfset1 in P. fset_solve. }
-
+    erewrite @dpar_game_l; try dprove_valid.
+    erewrite @dpar_game_l; try dprove_valid.
     rewrite AdvantageD_dlink.
-    erewrite <- (@dpar_empty_r (AuxL p)).
-    rewrite -dlink_assoc. 
-    erewrite <- swash.
-    2-7: dprove_valid.
     apply AdvL.
     unfold A_left.
     dprove_valid.
-    1,2: apply fsubsetxx.
+
   + rewrite AdvantageD_dlink.
-    erewrite -> AdvantageD_dpar_r.
-    2-7: try dprove_valid.
+    erewrite @dpar_game_r; try dprove_valid.
+    erewrite @dpar_game_r; try dprove_valid.
     rewrite AdvantageD_dlink.
-    erewrite <- (@dpar_empty_l (AuxR p)).
-    rewrite -dlink_assoc.
-    erewrite <- swish.
-    2-7: try dprove_valid.
     apply AdvR.
     unfold A_right.
     dprove_valid.
-    1,2: apply fsubsetxx.
 Qed.
 
 End SigmaOR.

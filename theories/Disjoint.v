@@ -813,11 +813,7 @@ Ltac dprove_rec :=
       | (nom_link ?P1 ?P2) => eapply valid_link; dprove_rec
       | (nom_par ?P1 ?P2) => eapply valid_par; dprove_rec
       | (dlink ?P1 ?P2) => eapply dlink_valid; dprove_rec
-      | (dpar ?P1 ?P2) =>
-          eapply dpar_valid_same_import;
-          [ | eapply valid_package_inject_import
-            | eapply valid_package_inject_import ] ;
-                dprove_rec
+      | (dpar ?P1 ?P2) => eapply dpar_valid; dprove_rec
       | (nom_ID ?I1) => eapply nom_ID_valid; dprove_rec
       | (trimmed_nom ?P1) => eapply trimmed_valid
           (* | (nom (pack ?P1)) => apply pack_valid
@@ -966,6 +962,38 @@ Qed.
 Proof.
   unfold Parable, Game_import.
   rewrite /Parable domm_ID /idents -fset0E imfset0 fdisjoints0 //.
+Qed.
+
+Lemma dpar_game_l {LP LQ LR EP EQ ER IQ} {P Q R : nom_package}
+  {VP : ValidPackage LP EQ EP P}
+  {VQ : ValidPackage LQ IQ EQ Q}
+  {VR : ValidPackage LR Game_import ER R}
+  {trP : trimmed EP P}
+  {trR : trimmed ER R} :
+  (dpar (dlink P Q) R) ≡ dlink (dpar P R) Q.
+Proof.
+  rewrite -{2}(@dpar_empty_r Q).
+  erewrite <- dinterchange.
+  2-7: dprove_valid.
+  2: apply Parable_Game_import_r.
+  rewrite dlink_id; [ reflexivity | | assumption ].
+  apply Game_import_flat.
+Qed.
+
+Lemma dpar_game_r {LP LQ LR EP EQ ER IQ} {P Q R : nom_package}
+  {VP : ValidPackage LP EQ EP P}
+  {VQ : ValidPackage LQ IQ EQ Q}
+  {VR : ValidPackage LR Game_import ER R}
+  {trP : trimmed EP P}
+  {trR : trimmed ER R} :
+  (dpar R (dlink P Q)) ≡ dlink (dpar R P) Q.
+Proof.
+  rewrite -{2}(@dpar_empty_l Q).
+  erewrite <- dinterchange.
+  2-7: dprove_valid.
+  2: apply Parable_Game_import_l.
+  rewrite dlink_id; [ reflexivity | | assumption ].
+  apply Game_import_flat.
 Qed.
 
 Lemma AdvantageD_dpar_dlink_r (P₀ P₁ P₁' G G' A : nom_package)
