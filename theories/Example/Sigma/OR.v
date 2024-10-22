@@ -60,9 +60,6 @@ Record or_params :=
   ; right : raw_sigma
   ; left_challenge : 'challenge left = 'fin #|exp|
   ; right_challenge : 'challenge right = 'fin #|exp|
-  ; d1 : disj left.(locs) right.(locs)
-  ; d2 : disj (Extra_locs_lr left right) left.(locs)
-  ; d3 : disj (Extra_locs_lr left right) right.(locs)
   }.
 
 Implicit Type (p : or_params).
@@ -87,6 +84,25 @@ Proof. rewrite H. exact id. Defined.
 
 #[global] Hint Unfold Extra_locs Extra_locs_lr : in_fset_eq.
 
+Definition l p := fresh (Extra_locs p) p.(left).(locs).
+Definition r p := fresh (dpair (Extra_locs p) p.(left).(locs)) p.(right).(locs).
+
+Hint Extern 10 (ValidCode ?L ?I ?c.(prog)) =>
+  eapply valid_injectLocations;
+    [| eapply valid_injectMap;
+      [| eapply prog_valid ]]; fset_solve
+  : typeclass_instances ssprove_valid_db.
+
+Hint Extern 10 (ValidCode ?L ?I (?p ∙ ?c.(prog))) =>
+  eapply valid_injectLocations;
+    [| eapply valid_injectMap;
+      [| eapply mcode_valid, prog_valid ]]; fset_solve
+  : typeclass_instances ssprove_valid_db.
+
+Hint Extern 10 (is_true (_ \in _)) =>
+  fset_solve : typeclass_insatnces ssprove_valid_db.
+
+#[tactic=ssprove_valid]
 Equations raw_or p : raw_sigma :=
   raw_or p :=
   {| Statement := 'statement p.(left) × 'statement p.(right)
@@ -98,9 +114,9 @@ Equations raw_or p : raw_sigma :=
        × 'challenge p.(right)) × 'response p.(right)
 
    ; locs :=
-       Extra_locs p
-         :|: p.(left).(locs)
-         :|: p.(right).(locs)
+        Extra_locs p
+         :|: l p ∙ p.(left).(locs)
+         :|: r p ∙ p.(right).(locs)
 
    ; R := λ '(h1, h2) '(wb, (w1, w2)),
        if wb then p.(left).(R) h1 w1 else p.(right).(R) h2 w2
@@ -108,15 +124,15 @@ Equations raw_or p : raw_sigma :=
    ; commit := λ '(h1, h2) '(wb, (w1, w2)),
       {code
         if wb then
-          R1 ← p.(left).(commit) h1 w1 ;;
+          R1 ← l p ∙ p.(left).(commit) h1 w1 ;;
           c2 ← sample uniform #|exp| ;;
           let c2 := into p.(right_challenge) c2 in
           '(R2, s2) ← p.(right).(simulate) h2 c2 ;;
-          #put challenge_loc p.(right) := c2 ;; (* Use c2 or cr? *)
+          #put challenge_loc p.(right) := c2 ;;
           #put response_loc p.(right) := s2 ;;
           ret (R1, R2)
         else
-          R2 ← p.(right).(commit) h2 w2 ;;
+          R2 ← r p ∙ p.(right).(commit) h2 w2 ;;
           c1 ← sample uniform #|exp| ;;
           let c1 := into p.(left_challenge) c1 in
           '(R1, s1) ← p.(left).(simulate) h1 c1 ;;
@@ -130,13 +146,13 @@ Equations raw_or p : raw_sigma :=
           c2 ← get challenge_loc p.(right) ;;
           s2 ← get response_loc p.(right) ;;
           let c1 := unpad p c c2 in
-          s1 ← p.(left).(response) h1 w1 a1 c1 ;;
+          s1 ← l p ∙ p.(left).(response) h1 w1 a1 c1 ;;
           ret (c1, s1, c2, s2)
         else
           c1 ← get challenge_loc p.(left) ;;
           s1 ← get response_loc p.(left) ;;
           let c2 := pad p c c1 in
-          s2 ← p.(right).(response) h2 w2 a2 c2 ;;
+          s2 ← r p ∙ p.(right).(response) h2 w2 a2 c2 ;;
           ret (c1, s1, c2, s2)
       }
    ; simulate := λ '(h1, h2) c,
@@ -163,16 +179,6 @@ Equations raw_or p : raw_sigma :=
         omap (λ w2 : 'witness p.(right), (false, (@chCanonical p.(left).(Witness), w2)))
           (p.(right).(extractor) h2 R2 c2 c2' s2 s2')
   |}.
-  Obligation 1.
-    ssprove_valid.
-    1,2,5,6: eapply valid_injectLocations; [| apply prog_valid ].
-    all: fset_solve.
-  Qed.
-  Obligation 2.
-    ssprove_valid.
-    3,6: eapply valid_injectLocations; [| apply prog_valid ].
-    all: fset_solve.
-  Qed.
 
 
 Definition Aux n m S T :=
@@ -210,48 +216,37 @@ Definition IF p : Interface :=
   ].
 #[global] Hint Unfold IF : in_fset_eq.
 
-Definition SHVZK_call_raw p (hwe : chInput (raw_or p)) :
-  raw_code (chTranscript (raw_or p))
-  :=
-    #import {sig #[ LEFT ] :
-      ('input p.(left)) → 'transcript p.(left)} as LeftTranscript ;;
-    #import {sig #[ RIGHT ] :
-      ('input p.(right)) → 'transcript p.(right)} as RightTranscript ;;
+#[tactic=ssprove_valid] Equations SHVZK_call p :
+  trimmed_package fset0 (IF p)
+    [interface #val #[ TRANSCRIPT ] : ('input (raw_or p)) → 'transcript (raw_or p)] :=
+  SHVZK_call p := [trimmed_package
+    #def #[ TRANSCRIPT ] (hwe : 'input (raw_or p)) : ('transcript (raw_or p)) {
+      #import {sig #[ LEFT ] :
+        ('input p.(left)) → 'transcript p.(left)} as LeftTranscript ;;
+      #import {sig #[ RIGHT ] :
+        ('input p.(right)) → 'transcript p.(right)} as RightTranscript ;;
 
-    let '(h, w, c) := hwe in
-    let '(h1, h2) := h in
-    let '(wb, (w1, w2)) := w in
-    c1 ← sample uniform #|exp| ;;
-    let c1 := into p.(left_challenge) c1 in
-    let c2 := pad p c c1 in
-    if wb then
-      '(_, R1, _, s1) ← LeftTranscript (h1, w1, c1) ;;
-      '(R2, s2) ← p.(right).(simulate) h2 c2 ;;
-      ret ((h1, h2), (R1, R2), c, (c1, s1, c2, s2))
-    else
-      '(R1, s1) ← p.(left).(simulate) h1 c1 ;;
-      '(_, R2, _, s2) ← RightTranscript (h2, w2, c2) ;;
-      ret ((h1, h2), (R1, R2), c, (c1, s1, c2, s2)).
-
-#[local] Instance SHVZK_call_proof p : ∀ hwe, ValidCode (fset [::]) (IF p) (SHVZK_call_raw p hwe).
-Proof.
-  intros hwe.
-  unfold SHVZK_call_raw, IF.
-  ssprove_valid; apply valid_scheme, prog_valid.
-Qed.
-
-Definition SHVZK_call p :
-  trimmed_package (fset [::]) (IF p)
-    [interface #val #[ TRANSCRIPT ] : ('input (raw_or p)) → 'transcript (raw_or p)]
-  := [trimmed_package
-    #def #[ TRANSCRIPT ] (hwe : 'input (raw_or p)) : ('transcript (raw_or p)) { SHVZK_call_raw p hwe }
+      let '(h, w, c) := hwe in
+      let '(h1, h2) := h in
+      let '(wb, (w1, w2)) := w in
+      c1 ← sample uniform #|exp| ;;
+      let c1 := into p.(left_challenge) c1 in
+      let c2 := pad p c c1 in
+      if wb then
+        '(_, R1, _, s1) ← LeftTranscript (h1, w1, c1) ;;
+        '(R2, s2) ← p.(right).(simulate) h2 c2 ;;
+        ret ((h1, h2), (R1, R2), c, (c1, s1, c2, s2))
+      else
+        '(R1, s1) ← p.(left).(simulate) h1 c1 ;;
+        '(_, R2, _, s2) ← RightTranscript (h2, w2, c2) ;;
+        ret ((h1, h2), (R1, R2), c, (c1, s1, c2, s2))
+    }
   ].
-
 
 Definition CALL p (L R : nom_package) :=
   nom_link (SHVZK_call p) (nom_par
-    (nom_link (AuxL p) L)
-    (nom_link (AuxR p) R)
+    (nom_link (AuxL p) (l p ∙ L))
+    (nom_link (AuxR p) (r p ∙ R))
   ).
 
 Lemma domm_link {P Q} : domm (link P Q) = domm P.
@@ -326,15 +321,92 @@ Proof.
   + rewrite otf_fto addrK fto_otf //.
 Qed.
 
+Lemma rename_assert {A} {π b k}
+  : π ∙ @assertD A b k = assertD b (λ x, π ∙ (k x)).
+Proof.
+  destruct b; done.
+Qed.
+
+Lemma rename_bind {A B} {π} {c : raw_code A} {k : A → raw_code B}
+  : π ∙ bind c k = bind (π ∙ c) (λ a, π ∙ k a).
+Proof.
+  rewrite /rename //=.
+  induction c => //=.
+  all: f_equal => //=.
+  all: apply functional_extensionality => y //=.
+Qed.
+
+Lemma rename_ret {A : choiceType} {π} (a : A) :
+  π ∙ ret a = ret a.
+Proof. done. Qed.
+
+Lemma rename_let {A B C : choiceType} {π} (ab : prod A B) (f : A → B → raw_code C) :
+  π ∙ (let '(a, b) := ab in f a b) = let '(a, b) := ab in π ∙ f a b.
+Proof. by destruct ab. Qed.
+
+Lemma rename_code {π} {A L I} {c : code L I A} : π ∙ prog c = {code π ∙ c}.
+Proof. done. Qed.
+
+Lemma rename_scheme {I A} (c : code fset0 I A) π
+  : π ∙ prog c = prog c.
+Proof.
+  destruct c as [c V].
+  simpl.
+  induction V => //=.
+  - etransitivity.
+    2: apply f_equal.
+    2: apply functional_extensionality, H1.
+    done.
+  - etransitivity.
+    2: apply f_equal.
+    2: apply functional_extensionality, H0.
+    done.
+Qed.
+
+
+Hint Extern 50 (_ = code_link _ _) =>
+  rewrite code_link_scheme
+  : ssprove_code_simpl.
+
+Hint Extern 50 (_ = rename _ (@assertD ?A _ _)) =>
+  rewrite (@rename_assert A)
+  : ssprove_code_simpl.
+
+Hint Extern 50 (_ = rename _ (bind _ _)) =>
+  rewrite rename_bind
+  : ssprove_code_simpl.
+
+Hint Extern 50 (_ = rename _ (ret _)) =>
+  rewrite rename_ret
+  : ssprove_code_simpl.
+
+Hint Extern 50 (_ = rename _ (let '(_, _) := _ in _)) =>
+  rewrite rename_let
+  : ssprove_code_simpl.
+
+
+#[export] Hint Resolve supp_fdisjoint : alpha_db.
+
+Lemma d_left p : disj (l p ∙ p.(left).(locs)) (Extra_locs p).
+Proof.
+  unfold l.
+  auto with alpha_db nocore.
+Qed.
+
+Lemma d_right p : disj (r p ∙ p.(right).(locs)) (Extra_locs p).
+Proof.
+  unfold r, dpair.
+  auto with alpha_db nocore.
+Qed.
+
 Lemma commit_call p :
     SHVZK_real (raw_or p) ≈₀ call_real_real p.
 Proof.
   eapply eq_rel_perf_ind.
   1: apply invariant_ignore_extra.
   simplify_eq_rel hwe.
-  unfold SHVZK_call_raw.
   destruct hwe as [[[h1 h2] [[] [w1 w2]]] c].
-  1,2: ssprove_code_simpl; simpl.
+  1,2: simpl; ssprove_code_simpl.
   1,2: simplify_linking.
   1,2: ssprove_code_simpl; simpl.
   1,2: rewrite !cast_fun_K.
@@ -342,19 +414,21 @@ Proof.
   + ssprove_swap_lhs 1%N.
     ssprove_swap_lhs 0%N.
     eapply r_uniform_bij with (1 := iso_bij p c) => c2.
+
+    ssprove_code_simpl.
+
     rewrite into_iso pad_unpad.
     move: (into p.(right_challenge) c2) => {}c2.
     ssprove_code_simpl_more.
     ssprove_sync => H.
     ssprove_code_simpl; simpl.
-    rewrite @code_link_scheme. 
+    rewrite rename_code. 
     apply rsame_head_ignore_prog.
-    1: rewrite fdisjointC; apply supp_fdisjoint, p.(d2).
+    1: apply supp_fdisjoint, d_left.
     move => a.
+    ssprove_code_simpl; simpl.
     eapply rel_jdg_replace_sem_r; simpl.
-    2: eapply swap_code.
-    3,4: apply prog_valid.
-    2: fset_solve.
+    2: eapply swap_code; ssprove_valid; eapply fdisjoint0s.
     apply rsame_head_ignore_prog; [ fset_solve |].
     intros [R1 s1].
     ssprove_swap_lhs 1%N.
@@ -363,36 +437,36 @@ Proof.
     ssprove_contract_put_get_lhs.
     apply r_put_lhs.
     ssprove_restore_pre; [ ssprove_invariant |].
+    rewrite rename_code.
     apply rsame_head_ignore_prog.
-    1: rewrite fdisjointC; apply supp_fdisjoint, p.(d2).
-    intros s2.
+    1: apply supp_fdisjoint, d_left.
+    move=> s2.
     by apply r_ret.
   + ssprove_swap_lhs 1%N.
     ssprove_swap_lhs 0%N.
     ssprove_sync => c1.
-    rewrite code_link_scheme.
     eapply rel_jdg_replace_sem_r; simpl.
     2: {
       eapply rsame_head => x.
       rewrite destruct_let_pair.
       eapply rreflexivity_rule.
     }
+    ssprove_code_simpl.
     eapply rel_jdg_replace_sem_r; simpl.
-    2: eapply swap_code.
-    3,4: ssprove_valid.
-    3,4,5: apply prog_valid.
-    2: fset_solve.
+    2: eapply swap_code; ssprove_valid.
+    3: rewrite rename_bind; ssprove_valid; apply valid_ret.
+    2: apply fdisjoints0.
     ssprove_code_simpl_more.
     ssprove_code_simpl; simpl.
     ssprove_sync => H.
+    rewrite rename_code.
     apply rsame_head_ignore_prog.
-    1: rewrite fdisjointC; apply supp_fdisjoint, p.(d3).
+    1: apply supp_fdisjoint, d_right.
     move => vr. 
 
     eapply rel_jdg_replace_sem_r; simpl.
-    2: eapply swap_code.
-    3,4: apply prog_valid.
-    2: fset_solve.
+    2: eapply swap_code; ssprove_valid;
+      [ apply fdisjoint0s | apply valid_ret ].
 
     apply rsame_head_ignore_prog; [ fset_solve |].
     intros [R1 z1].
@@ -402,8 +476,10 @@ Proof.
     ssprove_contract_put_get_lhs.
     apply r_put_lhs.
     ssprove_restore_pre; [ ssprove_invariant |].
+    ssprove_code_simpl.
+    rewrite rename_code.
     apply rsame_head_ignore_prog.
-    1: rewrite fdisjointC; apply supp_fdisjoint, p.(d3).
+    1: apply supp_fdisjoint, d_right.
     intros s2.
     by apply r_ret.
 Qed.
@@ -414,7 +490,6 @@ Lemma simulate_call p :
 Proof.
   apply eq_rel_perf_ind_eq.
   simplify_eq_rel hwe.
-  unfold SHVZK_call_raw.
   destruct hwe as [[[h1 h2] [[] [w1 w2]]] c].
   1,2: ssprove_code_simpl; simpl.
   1,2: simplify_linking.
@@ -424,32 +499,38 @@ Proof.
   1,2: ssprove_swap_rhs 0%N; ssprove_sync_eq => cl.
   + ssprove_code_simpl_more.
     ssprove_sync => P.
-    rewrite code_link_scheme.
     ssprove_code_simpl.
+    ssprove_code_simpl.
+    rewrite rename_scheme.
     eapply rsame_head => t1.
     move: t1 => [l1 l2].
+    simpl.
     eapply rsame_head => t2.
     move: t2 => [r1 r2].
     by eapply r_ret.
 
-  + rewrite code_link_scheme.
-    eapply rel_jdg_replace_sem_l.
+  + eapply rel_jdg_replace_sem_l.
     2: eapply rel_jdg_replace_r.
     3: setoid_rewrite destruct_let_pair; reflexivity.
     2: eapply swap_code.
-    3,4: ssprove_valid; apply prog_valid.
-    2: fset_solve.
+    3,4: ssprove_valid.
+    3: rewrite rename_bind rename_scheme; ssprove_valid.
+    3: destruct x0; apply valid_ret.
+    2: instantiate (1 := fset0); apply fdisjoint0s.
     ssprove_code_simpl_more.
     ssprove_sync => H.
     ssprove_code_simpl; simpl.
     move: (into p.(left_challenge) cl) => {}cl.
 
+    ssprove_code_simpl; simpl.
+    rewrite rename_scheme.
     eapply rel_jdg_replace_sem_l.
+    2: ssprove_code_simpl.
     2: eapply rel_jdg_replace_r.
     3: setoid_rewrite destruct_let_pair; reflexivity.
     2: eapply swap_code.
     3,4: ssprove_valid; apply prog_valid.
-    2: fset_solve.
+    2: instantiate (1 := fset0); apply fdisjoint0s.
 
     eapply rsame_head => t1.
     move: t1 => [l1 l2].
@@ -486,6 +567,21 @@ Proof. rewrite /idents imfset0 //. Qed.
 
 Hint Rewrite idents0 : in_fset_eq.
 
+Lemma d_left_right p : disj (l p ∙ p.(left).(locs)) (r p ∙ p.(right).(locs)).
+Proof.
+  unfold l, r, dpair.
+  auto with alpha_db nocore.
+Qed.
+
+#[export]
+Hint Rewrite <- @supp_equi : in_fset_eq.
+
+Lemma rename_fset0 {X : actionOrdType} {π} : π ∙ fset0 = @fset0 X.
+Proof. rewrite /rename /= imfset0 //. Qed.
+
+#[export]
+Hint Rewrite @rename_fset0 : in_fset_eq.
+
 Theorem OR_SHVZK p :
   ∀ ε₁ ε₂ : nom_package → Axioms.R,
     Adv_SHVZK p.(left) ε₁ →
@@ -498,26 +594,24 @@ Proof.
   erewrite <- (AdvantageD_perf_r (simulate_call p)).
 
   unfold call_real_real, call_ideal_ideal, CALL.
-  repeat (rewrite nom_link_dlink || rewrite nom_par_dpar).
-  2-9: move: (d1 p); unfold disj; fset_solve.
+  repeat (rewrite nom_link_dlink || rewrite nom_par_dpar || rewrite rename_alpha).
+  2-9: move: (d_left_right p); unfold disj; fset_solve.
 
   advantage_trans (call_ideal_real p).
 
   apply lerD.
   1,2: unfold call_ideal_real, CALL.
-  1,2: repeat (rewrite nom_link_dlink || rewrite nom_par_dpar).
-  2-5,7-10: move: (d2 p) (d3 p); unfold disj; try fset_solve.
+  1,2: repeat (rewrite nom_link_dlink || rewrite nom_par_dpar || rewrite rename_alpha).
+  2-5,7-10: move: (d_left p) (d_right p); unfold disj; try fset_solve.
   + rewrite AdvantageD_dlink.
-    erewrite @dpar_game_l; try dprove_valid.
-    erewrite @dpar_game_l; try dprove_valid.
+    erewrite @dpar_game_l, @dpar_game_l; try dprove_valid.
     rewrite AdvantageD_dlink.
     apply AdvL.
     unfold A_left.
     dprove_valid.
 
   + rewrite AdvantageD_dlink.
-    erewrite @dpar_game_r; try dprove_valid.
-    erewrite @dpar_game_r; try dprove_valid.
+    erewrite @dpar_game_r, @dpar_game_r; try dprove_valid.
     rewrite AdvantageD_dlink.
     apply AdvR.
     unfold A_right.

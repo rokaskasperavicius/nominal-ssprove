@@ -807,14 +807,17 @@ Proof. done. Qed.
 Ltac dprove_rec :=
   lazymatch goal with
   | |- (ValidPackage ?L ?I ?E (val ?P)) =>
-      tryif assert_fails (is_evar I) then (eapply valid_package_inject_import; dprove_rec) else
-      tryif assert_fails (is_evar E) then (eapply valid_package_inject_export; dprove_rec) else
+      tryif assert_fails (is_evar I)
+        then (eapply valid_package_inject_import; dprove_rec) else
+      tryif assert_fails (is_evar E)
+        then (eapply valid_package_inject_export; dprove_rec) else
       lazymatch P with
       | (nom_link ?P1 ?P2) => eapply valid_link; dprove_rec
       | (nom_par ?P1 ?P2) => eapply valid_par; dprove_rec
       | (dlink ?P1 ?P2) => eapply dlink_valid; dprove_rec
       | (dpar ?P1 ?P2) => eapply dpar_valid; dprove_rec
       | (nom_ID ?I1) => eapply nom_ID_valid; dprove_rec
+      | (rename ?pi ?P1) => eapply rename_valid; dprove_rec
       | (trimmed_nom ?P1) => eapply trimmed_valid
           (* | (nom (pack ?P1)) => apply pack_valid
       | (nom ?P1) => apply nom_valid
