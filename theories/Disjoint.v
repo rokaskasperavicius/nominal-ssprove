@@ -864,7 +864,7 @@ Ltac dprove_rec :=
   | |- (trimmed ?E1 (val (nom_ID ?E2))) =>
       apply trimmed_ID
   | |- (trimmed ?E ?P) =>
-      (try assumption) || dprove_trimmed
+      (try assumption) || (try apply tr_trimmed) || dprove_trimmed
   | |- ?x =>
       done ||
       (* idtac x ; *)
