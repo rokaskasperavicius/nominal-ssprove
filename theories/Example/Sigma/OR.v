@@ -4,13 +4,6 @@ From mathcomp Require Import all_ssreflect all_algebra reals distr realsum
   eqtype choice seq.
 Set Warnings "notation-overridden,ambiguous-paths".
 
-From Mon Require Import SPropBase.
-
-From Crypt Require Import Axioms ChoiceAsOrd SubDistr Couplings
-  UniformDistrLemmas FreeProbProg Theta_dens RulesStateProb UniformStateProb
-  pkg_core_definition choice_type pkg_composition pkg_rhl Package Prelude
-  SigmaProtocol.
-
 From Coq Require Import Utf8.
 From extructures Require Import ord fset fmap.
 
@@ -23,28 +16,23 @@ Set Bullet Behavior "Strict Subproofs".
 Set Default Goal Selector "!".
 Set Primitive Projections.
 
-Local Open Scope ring_scope.
+From NominalSSP Require Import Prelude.
+Import Num.Def Num.Theory Order.POrderTheory.
+Import PackageNotation.
+#[local] Open Scope ring_scope.
+#[local] Open Scope package_scope.
+
+From NominalSSP Require Import Group Sigma.
+From Mon Require Import SPropBase.
+Set Equations Transparent.
 Import GroupScope GRing.Theory.
 
-Import Num.Def.
-Import Num.Theory.
-Import Order.POrderTheory.
-
-Import PackageNotation.
-
-Require Import Btauto.
-
-From NominalSSP Require Import FsetSolve Group Fresh Pr Nominal NomPackage Disjoint Sigma SSProve.
-Import FsetSolve.
-
-Set Equations Transparent.
 
 Module SigmaOR (GP : GroupParam).
 
 Module GT := GroupTheorems GP.
 Import GP GT.
 
-#[local] Open Scope package_scope.
 
 Definition challenge_loc p : Location := ('challenge p; 1%N).
 Definition response_loc p : Location := ('response p; 2%N).
@@ -86,21 +74,6 @@ Proof. rewrite H. exact id. Defined.
 
 Definition l p := fresh (Extra_locs p) p.(left).(locs).
 Definition r p := fresh (dpair (Extra_locs p) p.(left).(locs)) p.(right).(locs).
-
-Hint Extern 10 (ValidCode ?L ?I ?c.(prog)) =>
-  eapply valid_injectLocations;
-    [| eapply valid_injectMap;
-      [| eapply prog_valid ]]; fset_solve
-  : typeclass_instances ssprove_valid_db.
-
-Hint Extern 10 (ValidCode ?L ?I (?p ∙ ?c.(prog))) =>
-  eapply valid_injectLocations;
-    [| eapply valid_injectMap;
-      [| eapply mcode_valid, prog_valid ]]; fset_solve
-  : typeclass_instances ssprove_valid_db.
-
-Hint Extern 10 (is_true (_ \in _)) =>
-  fset_solve : typeclass_insatnces ssprove_valid_db.
 
 #[tactic=ssprove_valid]
 Equations raw_or p : raw_sigma :=
@@ -166,9 +139,9 @@ Equations raw_or p : raw_sigma :=
      }
    ; verify := λ '(h1, h2) '(R1, R2) c z,
       let '(c1, s1, c2, s2) := z in
-        p.(left).(verify) h1 R1 c1 s1
-        && p.(right).(verify) h2 R2 c2 s2
-        && (pad p c c1 == c2)
+      p.(left).(verify) h1 R1 c1 s1
+      && p.(right).(verify) h2 R2 c2 s2
+      && (pad p c c1 == c2)
    ; extractor := λ '(h1, h2) '(R1, R2) e e' z z',
       let '(c1, s1, c2, s2) := z in
       let '(c1', s1', c2', s2') := z' in
@@ -209,15 +182,12 @@ Definition AuxR p :=
     (chTranscript p.(right))
   ).
 
-Definition IF p : Interface :=
-  [interface
-     #val #[ LEFT ] : ('input p.(left)) → 'transcript p.(left) ;
-     #val #[ RIGHT ] : ('input p.(right)) → 'transcript p.(right)
-  ].
-#[global] Hint Unfold IF : in_fset_eq.
-
 #[tactic=ssprove_valid] Equations SHVZK_call p :
-  trimmed_package fset0 (IF p)
+  trimmed_package fset0
+    [interface
+       #val #[ LEFT ] : ('input p.(left)) → 'transcript p.(left) ;
+       #val #[ RIGHT ] : ('input p.(right)) → 'transcript p.(right)
+    ]
     [interface #val #[ TRANSCRIPT ] : ('input (raw_or p)) → 'transcript (raw_or p)] :=
   SHVZK_call p := [trimmed_package
     #def #[ TRANSCRIPT ] (hwe : 'input (raw_or p)) : ('transcript (raw_or p)) {
@@ -249,22 +219,13 @@ Definition CALL p (L R : nom_package) :=
     (nom_link (AuxR p) (r p ∙ R))
   ).
 
-Lemma domm_link {P Q} : domm (link P Q) = domm P.
-Proof. apply domm_map. Qed.
-
-Hint Rewrite domm_set domm0 @domm_link : in_fset_eq.
-
 #[local] Instance call_valid p :
   ∀ (L R : nom_package),
     ValidPackage L.(loc) [interface] (Transcript p.(left)) L →
     ValidPackage R.(loc) [interface] (Transcript p.(right)) R →
     ValidPackage (CALL p L R).(loc) [interface] (Transcript (raw_or p))
       (CALL p L R).
-Proof.
-  move => L R VL VR.
-  unfold CALL.
-  dprove_valid.
-Qed.
+Proof. move => L R VL VR. unfold CALL. dprove_valid. Qed.
 
 Lemma destruct_let_pair : ∀ A B C (xy : A * B) (f : A → B → C), (let (x, y) := xy in f x y) = f xy.1 xy.2.
 Proof.
@@ -290,7 +251,6 @@ Proof.
   fset_solve.
 Qed.
 
-Hint Rewrite in_fset : in_fset_eq.
 
 Definition iso p (c : 'fin #|exp|) : Arit (uniform #|exp|) → Arit (uniform #|exp|)
   := λ c2, fto (otf c2 - otf c).
@@ -321,83 +281,12 @@ Proof.
   + rewrite otf_fto addrK fto_otf //.
 Qed.
 
-Lemma rename_assert {A} {π b k}
-  : π ∙ @assertD A b k = assertD b (λ x, π ∙ (k x)).
-Proof.
-  destruct b; done.
-Qed.
-
-Lemma rename_bind {A B} {π} {c : raw_code A} {k : A → raw_code B}
-  : π ∙ bind c k = bind (π ∙ c) (λ a, π ∙ k a).
-Proof.
-  rewrite /rename //=.
-  induction c => //=.
-  all: f_equal => //=.
-  all: apply functional_extensionality => y //=.
-Qed.
-
-Lemma rename_ret {A : choiceType} {π} (a : A) :
-  π ∙ ret a = ret a.
-Proof. done. Qed.
-
-Lemma rename_let {A B C : choiceType} {π} (ab : prod A B) (f : A → B → raw_code C) :
-  π ∙ (let '(a, b) := ab in f a b) = let '(a, b) := ab in π ∙ f a b.
-Proof. by destruct ab. Qed.
-
-Lemma rename_code {π} {A L I} {c : code L I A} : π ∙ prog c = {code π ∙ c}.
-Proof. done. Qed.
-
-Lemma rename_scheme {I A} (c : code fset0 I A) π
-  : π ∙ prog c = prog c.
-Proof.
-  destruct c as [c V].
-  simpl.
-  induction V => //=.
-  - etransitivity.
-    2: apply f_equal.
-    2: apply functional_extensionality, H1.
-    done.
-  - etransitivity.
-    2: apply f_equal.
-    2: apply functional_extensionality, H0.
-    done.
-Qed.
-
-
-Hint Extern 50 (_ = code_link _ _) =>
-  rewrite code_link_scheme
-  : ssprove_code_simpl.
-
-Hint Extern 50 (_ = rename _ (@assertD ?A _ _)) =>
-  rewrite (@rename_assert A)
-  : ssprove_code_simpl.
-
-Hint Extern 50 (_ = rename _ (bind _ _)) =>
-  rewrite rename_bind
-  : ssprove_code_simpl.
-
-Hint Extern 50 (_ = rename _ (ret _)) =>
-  rewrite rename_ret
-  : ssprove_code_simpl.
-
-Hint Extern 50 (_ = rename _ (let '(_, _) := _ in _)) =>
-  rewrite rename_let
-  : ssprove_code_simpl.
-
-
-#[export] Hint Resolve supp_fdisjoint : alpha_db.
 
 Lemma d_left p : disj (l p ∙ p.(left).(locs)) (Extra_locs p).
-Proof.
-  unfold l.
-  auto with alpha_db nocore.
-Qed.
+Proof.  unfold l.  auto with alpha_db nocore.  Qed.
 
 Lemma d_right p : disj (r p ∙ p.(right).(locs)) (Extra_locs p).
-Proof.
-  unfold r, dpair.
-  auto with alpha_db nocore.
-Qed.
+Proof.  unfold r, dpair.  auto with alpha_db nocore.  Qed.
 
 Lemma commit_call p :
     SHVZK_real (raw_or p) ≈₀ call_real_real p.
@@ -539,48 +428,16 @@ Proof.
     by eapply r_ret.
 Qed.
 
-Lemma rew_notin : forall (T : ordType) (x : T) (s : {fset T}), x \notin s = ~~ (x \in s).
-Proof. reflexivity. Qed.
-
-#[global] Hint Rewrite rew_notin : in_fset_eq.
-
-Lemma supp_trimmed_package {L I E} (P : trimmed_package L I E)
-  : supp (trimmed_nom P) = supp L.
-Proof.
-  done.
-Qed.
-
-(* #[local] Hint Unfold disj : in_fset_eq. *)
-#[local] Hint Rewrite @supp_trimmed_package : in_fset_eq.
-#[local] Hint Rewrite @supp0 : in_fset_eq.
-
 Definition A_left p A : nom_package :=
   (((A ⊛ SHVZK_call p) ⊛ dpar (AuxL p) (AuxR p ⊛ SHVZK_real (right p)))).
 
 Definition A_right p A : nom_package :=
   (((A ⊛ SHVZK_call p) ⊛ dpar (AuxL p ⊛ SHVZK_ideal (left p)) (AuxR p))).
 
-Hint Rewrite @domm_ID : in_fset_eq.
-
-Lemma idents0 : idents fset0 = fset0.
-Proof. rewrite /idents imfset0 //. Qed.
-
-Hint Rewrite idents0 : in_fset_eq.
 
 Lemma d_left_right p : disj (l p ∙ p.(left).(locs)) (r p ∙ p.(right).(locs)).
-Proof.
-  unfold l, r, dpair.
-  auto with alpha_db nocore.
-Qed.
+Proof.  unfold l, r, dpair.  auto with alpha_db nocore.  Qed.
 
-#[export]
-Hint Rewrite <- @supp_equi : in_fset_eq.
-
-Lemma rename_fset0 {X : actionOrdType} {π} : π ∙ fset0 = @fset0 X.
-Proof. rewrite /rename /= imfset0 //. Qed.
-
-#[export]
-Hint Rewrite @rename_fset0 : in_fset_eq.
 
 Theorem OR_SHVZK p :
   ∀ ε₁ ε₂ : nom_package → Axioms.R,
@@ -594,15 +451,14 @@ Proof.
   erewrite <- (AdvantageD_perf_r (simulate_call p)).
 
   unfold call_real_real, call_ideal_ideal, CALL.
-  repeat (rewrite nom_link_dlink || rewrite nom_par_dpar || rewrite rename_alpha).
-  2-9: move: (d_left_right p); unfold disj; fset_solve.
+  pose proof (d_left_right p).
+  dprove_convert.
 
   advantage_trans (call_ideal_real p).
 
   apply lerD.
   1,2: unfold call_ideal_real, CALL.
-  1,2: repeat (rewrite nom_link_dlink || rewrite nom_par_dpar || rewrite rename_alpha).
-  2-5,7-10: move: (d_left p) (d_right p); unfold disj; try fset_solve.
+  1,2: move: {H} (d_left p) (d_right p) => H1 H2; dprove_convert; move=> {H1} {H2}.
   + rewrite AdvantageD_dlink.
     erewrite @dpar_game_l, @dpar_game_l; try dprove_valid.
     rewrite AdvantageD_dlink.
