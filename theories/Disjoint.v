@@ -459,16 +459,11 @@ Proof.
   apply eq.
 Qed.
 
-(*
 #[export]
 Instance nom_link_valid {L L' I M E} {P P' : nom_package} :
   ValidPackage L M E P → ValidPackage L' I M P' →
   ValidPackage (L :|: L') I E (nom_link P P').
-Proof.
-  intros V1 V2.
-  eapply (valid_link _ _ _ _ _ _ _ V1 V2).
-Qed.
- *)
+Proof. by apply valid_link. Qed.
 
 #[export]
 Instance dlink_valid {L L' I M E} {P P' : nom_package} :
@@ -479,6 +474,24 @@ Proof.
   eapply (valid_link _ _ _ _ _ _ _ V1).
   apply rename_valid.
   apply V2.
+Qed.
+
+#[export]
+Instance nom_par_valid {L L' I I' E E'} {P P' : nom_package} :
+  Parable P P' →
+  ValidPackage L I E P → ValidPackage L' I' E' P' →
+  ValidPackage (L :|: L') (I :|: I') (E :|: E') (nom_par P P').
+Proof. by apply valid_par. Qed.
+
+#[export]
+Instance nom_par_valid_same_import {L L' I E E'} {P P' : nom_package} :
+  Parable P P' →
+  ValidPackage L I E P → ValidPackage L' I E' P' →
+  ValidPackage (L :|: L') I (E :|: E') (nom_par P P').
+Proof.
+  intros Par V1 V2.
+  rewrite -(fsetUid I).
+  by apply nom_par_valid.
 Qed.
 
 #[export]

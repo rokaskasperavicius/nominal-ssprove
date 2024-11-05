@@ -451,22 +451,22 @@ Proof.
   erewrite <- (AdvantageD_perf_r (simulate_call p)).
 
   unfold call_real_real, call_ideal_ideal, CALL.
-  pose proof (d_left_right p).
-  dprove_convert.
+  move: (d_left_right p) => H; dprove_convert.
 
   advantage_trans (call_ideal_real p).
 
   apply lerD.
   1,2: unfold call_ideal_real, CALL.
-  1,2: move: {H} (d_left p) (d_right p) => H1 H2; dprove_convert; move=> {H1} {H2}.
-  + rewrite AdvantageD_dlink.
+  + move: (d_left p) => {}H; dprove_convert.
+    rewrite AdvantageD_dlink.
     erewrite @dpar_game_l, @dpar_game_l; try dprove_valid.
     rewrite AdvantageD_dlink.
     apply AdvL.
     unfold A_left.
     dprove_valid.
 
-  + rewrite AdvantageD_dlink.
+  + move: (d_right p) => {}H; dprove_convert.
+    rewrite AdvantageD_dlink.
     erewrite @dpar_game_r, @dpar_game_r; try dprove_valid.
     rewrite AdvantageD_dlink.
     apply AdvR.
