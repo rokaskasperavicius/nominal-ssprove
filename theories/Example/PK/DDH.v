@@ -94,13 +94,13 @@ Proof.
 Qed.
 
 
-Definition ONE := 0%N.
-Definition TWO := 1%N.
+Definition GETA := 0%N.
+Definition GETBC := 1%N.
 
 Definition I_DDH :=
   [interface
-    #val #[ ONE ] : 'unit → 'el ;
-    #val #[ TWO ] : 'unit → 'el × 'el
+    #val #[ GETA ] : 'unit → 'el ;
+    #val #[ GETBC ] : 'unit → 'el × 'el
   ].
 
 Definition init_loc : Location := ('option 'unit; 5%N).
@@ -111,12 +111,12 @@ Definition DDH1_loc := fset [:: init_loc ].
 Definition DDH0 :
   trimmed_package DDH0_loc Game_import I_DDH :=
   [trimmed_package
-    #def #[ ONE ] ('tt : 'unit) : 'el {
+    #def #[ GETA ] ('tt : 'unit) : 'el {
       a ← sample uniform #|exp| ;;
       #put mga_loc := Some (op_exp op_g a) ;;
       ret (op_exp op_g a)
     } ;
-    #def #[ TWO ] ('tt : 'unit) : 'el × 'el {
+    #def #[ GETBC ] ('tt : 'unit) : 'el × 'el {
       ga ← getSome mga_loc ;;
       #put mga_loc := None ;;
       b ← sample uniform #|exp| ;;
@@ -127,12 +127,12 @@ Definition DDH0 :
 Definition DDH1 :
   trimmed_package DDH1_loc Game_import I_DDH :=
   [trimmed_package
-    #def #[ ONE ] ('tt : 'unit) : 'el {
+    #def #[ GETA ] ('tt : 'unit) : 'el {
       a ← sample uniform #|exp| ;;
       #put init_loc := Some tt ;;
       ret (op_exp op_g a)
     } ;
-    #def #[ TWO ] ('tt : 'unit) : 'el × 'el {
+    #def #[ GETBC ] ('tt : 'unit) : 'el × 'el {
       _ ← getSome init_loc ;;
       #put init_loc := None ;;
       b ← sample uniform #|exp| ;;

@@ -88,16 +88,16 @@ Definition RED :
   trimmed_package RED_loc I_DDH (I_PK_OTSR elgamal) :=
   [trimmed_package
     #def #[ GET ] (_ : 'unit) : 'el {
-      #import {sig #[ ONE ] : 'unit → 'el } as ONE ;;
+      #import {sig #[ GETA ] : 'unit → 'el } as GETA ;;
       getNone stop_loc ;;
       #put stop_loc := Some tt ;;
-      pk ← ONE tt ;;
+      pk ← GETA tt ;;
       @ret 'el pk
     } ;
     #def #[ QUERY ] (m : 'el) : 'el × 'el {
-      #import {sig #[ TWO ] : 'unit → 'el × 'el } as TWO ;;
+      #import {sig #[ GETBC ] : 'unit → 'el × 'el } as GETBC ;;
       _ ← getSome stop_loc ;;
-      '(r, sh) ← TWO tt ;;
+      '(r, sh) ← GETBC tt ;;
       @ret ('el × 'el) (r, op_mul m sh)
     }
   ].
