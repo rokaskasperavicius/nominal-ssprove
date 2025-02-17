@@ -85,8 +85,8 @@ Definition RED_loc :=
   fset [:: stop_loc ].
 
 Definition RED :
-  trimmed_package RED_loc I_DDH (I_PK_OTSR elgamal) :=
-  [trimmed_package
+  module RED_loc I_DDH (I_PK_OTSR elgamal) :=
+  [module
     #def #[ GET ] (_ : 'unit) : 'el {
       #import {sig #[ ONE ] : 'unit → 'el } as ONE ;;
       getNone stop_loc ;;
@@ -104,12 +104,12 @@ Definition RED :
 
 #[export] Instance valid_RED_DDH0
   : ValidPackage (RED_loc :|: DDH0_loc)
-      Game_import (I_PK_OTSR elgamal) (nom_link RED DDH0).
+      Game_import (I_PK_OTSR elgamal) (RED ∘ DDH0)%share.
 Proof. dprove_valid. Qed.
 
 #[export] Instance valid_RED_DDH1
   : ValidPackage (RED_loc :|: DDH1_loc)
-      Game_import (I_PK_OTSR elgamal) (nom_link RED DDH1).
+      Game_import (I_PK_OTSR elgamal) (RED ∘ DDH1)%share.
 Proof. dprove_valid. Qed.
 
 #[local] Hint Unfold DDH0_loc DDH1_loc PK_OTSR_loc RED_loc : in_fset_eq.
@@ -132,7 +132,7 @@ Proof.
   ssprove_invariant; [ apply fsubsetxx | done ].
 Qed.
 
-Lemma pk_ots0_perf : PK_OTSR0 elgamal ≈₀ nom_link RED DDH0.
+Lemma pk_ots0_perf : PK_OTSR0 elgamal ≈₀ (RED ∘ DDH0)%share.
 Proof.
   apply (eq_rel_perf_ind _ _ inv0).
   1: exact inv0_Invariant.
@@ -239,7 +239,7 @@ Proof.
   ssprove_invariant; [ apply fsubsetxx | done ].
 Qed.
 
-Lemma pk_ots1_perf : PK_OTSR1 elgamal ≈₀ nom_link RED DDH1.
+Lemma pk_ots1_perf : PK_OTSR1 elgamal ≈₀ (RED ∘ DDH1)%share.
 Proof.
   apply (eq_rel_perf_ind _ _ inv1).
   1: exact inv1_Invariant.
@@ -332,14 +332,14 @@ Proof.
 Qed.
 
 Theorem elgamal_sound {LA : {fset Location}}
-  : ∀ (A : trimmed_package LA (I_PK_OTSR elgamal) A_export),
-  AdvantageP (PK_OTSR elgamal) A = AdvantageP DDH (dlink A RED).
+  : ∀ (A : module LA (I_PK_OTSR elgamal) A_export),
+  AdvFor (PK_OTSR elgamal) A = AdvFor DDH (A ∘ RED).
 Proof.
   intros A.
-  unfold AdvantageP.
-  rewrite (AdvantageD_perf_l pk_ots0_perf).
-  rewrite (AdvantageD_perf_r pk_ots1_perf).
-  rewrite -AdvantageD_dlink.
+  unfold AdvFor.
+  rewrite (Adv_perf_l pk_ots0_perf).
+  rewrite (Adv_perf_r pk_ots1_perf).
+  rewrite -Adv_sep_link.
   dprove_convert.
 Qed.
 

@@ -31,6 +31,8 @@ Import Num.Def Num.Theory Order.POrderTheory.
 Import PackageNotation.
 #[local] Open Scope ring_scope.
 #[local] Open Scope package_scope.
+#[local] Open Scope share_scope.
+#[local] Open Scope sep_scope.
 
 
 Section KEMDEM.
@@ -222,8 +224,8 @@ Section KEMDEM.
     ].
 
   (** Definition of the KEY package *)
-  Definition KEY : trimmed_package KEY_loc [interface] KEY_out :=
-    [trimmed_package
+  Definition KEY : module KEY_loc [interface] KEY_out :=
+    [module
       #def #[ GEN ] (_ : 'unit) : 'unit {
         k ← get k_loc ;;
         #assert (k == None) ;;
@@ -272,8 +274,8 @@ Section KEMDEM.
       #val #[ DECAP ] : 'ekey → 'key
     ].
 
-  Definition KEM (b : bool) : trimmed_package KEM_loc (KEM_in b) KEM_out :=
-    [trimmed_package
+  Definition KEM (b : bool) : module KEM_loc (KEM_in b) KEM_out :=
+    [module
       #def #[ KEMGEN ] (_ : 'unit) : 'pkey {
         sk ← get sk_loc ;;
         #assert (sk == None) ;;
@@ -334,7 +336,7 @@ Section KEMDEM.
     Here and afterwards we use #[tactic=notac] to tell Equations not to
     preprocess the generated goals.
   *)
-  Definition KEM_CCA b := dlink (dpar (KEM b) (nom_ID IGET)) KEY.
+  Definition KEM_CCA b := (KEM b || ID IGET) ∘ KEY.
 
   #[local] Hint Unfold KEY_out IGET ISET IGEN : in_fset_eq.
   #[local] Hint Unfold KEM_in KEM_out KEM_CCA_out : in_fset_eq.
@@ -366,8 +368,8 @@ Section KEMDEM.
       #val #[ DEC ] : 'cipher → 'plain
     ].
 
-  Definition DEM (b : bool) : trimmed_package DEM_loc DEM_in DEM_out :=
-    [trimmed_package
+  Definition DEM (b : bool) : module DEM_loc DEM_in DEM_out :=
+    [module
       #def #[ ENC ] (m : 'plain) : 'cipher {
         #import {sig #[ GET ] : 'unit → 'key } as GET ;;
         c ← get c_loc ;;
@@ -405,7 +407,7 @@ Section KEMDEM.
     DEM_loc :|: KEY_loc.
 
   Definition DEM_CCA b :=
-    dlink (dpar (nom_ID IGEN) (DEM b)) KEY.
+    (ID IGEN || DEM b) ∘ KEY.
 
   #[local] Hint Unfold DEM_in DEM_out DEM_CCA_out : in_fset_eq.
 
@@ -429,8 +431,8 @@ Section KEMDEM.
     ].
 
   Definition PKE_CCA (ζ : PKE_scheme) b :
-    trimmed_package PKE_CCA_loc Game_import PKE_CCA_out :=
-    [trimmed_package
+    module PKE_CCA_loc Game_import PKE_CCA_out :=
+    [module
       #def #[ PKGEN ] (_ : 'unit) : 'pkey {
         sk ← get sk_loc ;;
         #assert (sk == None) ;;
@@ -481,8 +483,8 @@ Section KEMDEM.
     PKE_CCA_out.
 
   Definition MOD_CCA (ζ : PKE_scheme) :
-    trimmed_package MOD_CCA_loc MOD_CCA_in MOD_CCA_out :=
-    [trimmed_package
+    module MOD_CCA_loc MOD_CCA_in MOD_CCA_out :=
+    [module
       #def #[ PKGEN ] (_ : 'unit) : 'pkey {
         #import {sig #[ KEMGEN ] : 'unit → 'pkey } as KEMGEN ;;
         pk ← get pk_m_loc ;;
@@ -543,62 +545,62 @@ Section KEMDEM.
 
   (** Corresponds to Lemma 19.a in the SSP paper *)
   Lemma single_key_a {LD₀ LD₁ LK₀ LK₁} {EK ED}:
-    ∀ (CD₀ : trimmed_package LD₀ IGET ED)
-      (CD₁ : trimmed_package LD₁ IGET ED)
-      (CK₀ : trimmed_package LK₀ ISET EK)
-      (CK₁ : trimmed_package LK₁ IGEN EK)
-      (A : nom_package),
-      let K₀ := dlink (dpar CK₀ (nom_ID IGET)) KEY in
-      let K₁ := dlink (dpar CK₁ (nom_ID IGET)) KEY in
-      let D₀ := dlink (dpar (nom_ID IGEN) CD₀) KEY in
-      let D₁ := dlink (dpar (nom_ID IGEN) CD₁) KEY in
+    ∀ (CD₀ : module LD₀ IGET ED)
+      (CD₁ : module LD₁ IGET ED)
+      (CK₀ : module LK₀ ISET EK)
+      (CK₁ : module LK₁ IGEN EK)
+      (A : raw_module),
+      let K₀ := (CK₀ || ID IGET) ∘ KEY in
+      let K₁ := (CK₁ || ID IGET) ∘ KEY in
+      let D₀ := (ID IGEN || CD₀) ∘ KEY in
+      let D₁ := (ID IGEN || CD₁) ∘ KEY in
       Parable CK₀ (ID IGET) →
       Parable CK₁ (ID IGET) →
       Parable (ID IGEN) CD₀ →
       Parable (ID IGEN) CD₁ →
-      AdvantageD (dlink (dpar CK₀ CD₀) KEY) (dlink (dpar CK₁ CD₁) KEY) A <=
-      AdvantageD K₀ K₁ (dlink A (dpar (nom_ID EK) CD₀)) +
-      AdvantageD D₀ D₁ (dlink A (dpar CK₁ (nom_ID ED))).
+      Adv ((CK₀ || CD₀) ∘ KEY) ((CK₁ || CD₁) ∘ KEY) A <=
+      Adv K₀ K₁ (A ∘ (ID EK || CD₀)) +
+      Adv D₀ D₁ (A ∘ (CK₁ || ID ED)).
   Proof.
     intros CD₀ CD₁ CK₀ CK₁ A.
     intros.
-    advantage_trans (dlink (dpar CK₁ CD₀) KEY).
+    advantage_trans ((CK₁ || CD₀) ∘ KEY).
     erewrite ->
-      (@AdvantageD_dpar_dlink_l _ _ _ _ _ _ _ _ _ (ISET :|: IGEN) IGET).
+      (@Adv_par_link_l _ _ _ _ _ _ _ _ _ (ISET :|: IGEN) IGET).
     (* why do we loop on first goal? with dprove_valid? *)
     2-10: dprove_valid.
-    erewrite -> (@AdvantageD_dpar_dlink_r _ _ _ _ _ _ _ _ _ IGEN IGET)
+    erewrite -> (@Adv_par_link_r _ _ _ _ _ _ _ _ _ IGEN IGET)
       ; dprove_valid.
   Qed.
 
   (** Corresponds to Lemma 19.b in the SSP paper *)
   Lemma single_key_b {LD₀ LD₁ LK₀ LK₁} {EK ED} :
-    ∀ (CD₀ : trimmed_package LD₀ IGET ED)
-      (CD₁ : trimmed_package LD₁ IGET ED)
-      (CK₀ : trimmed_package LK₀ ISET EK)
-      (CK₁ : trimmed_package LK₁ IGEN EK)
-      (A : nom_package),
-      let K₀ := dlink (dpar CK₀ (nom_ID IGET)) KEY in
-      let K₁ := dlink (dpar CK₁ (nom_ID IGET)) KEY in
-      let D₀ := dlink (dpar (nom_ID IGEN) CD₀) KEY in
-      let D₁ := dlink (dpar (nom_ID IGEN) CD₁) KEY in
+    ∀ (CD₀ : module LD₀ IGET ED)
+      (CD₁ : module LD₁ IGET ED)
+      (CK₀ : module LK₀ ISET EK)
+      (CK₁ : module LK₁ IGEN EK)
+      (A : raw_module),
+      let K₀ := (CK₀ || ID IGET) ∘ KEY in
+      let K₁ := (CK₁ || ID IGET) ∘ KEY in
+      let D₀ := (ID IGEN || CD₀) ∘ KEY in
+      let D₁ := (ID IGEN || CD₁) ∘ KEY in
       Parable CK₀ (ID IGET) →
       Parable CK₁ (ID IGET) →
       Parable (ID IGEN) CD₀ →
       Parable (ID IGEN) CD₁ →
-      AdvantageD (dlink (dpar CK₀ CD₀) KEY) (dlink (dpar CK₀ CD₁) KEY) A <=
-      AdvantageD K₀ K₁ (dlink A (dpar (nom_ID EK) CD₀)) +
-      AdvantageD D₀ D₁ (dlink A (dpar CK₁ (nom_ID ED))) +
-      AdvantageD K₀ K₁ (dlink A (dpar (nom_ID EK) CD₁)).
+      Adv ((CK₀ || CD₀) ∘ KEY) ((CK₀ || CD₁) ∘ KEY) A <=
+      Adv K₀ K₁ (A ∘ (ID EK || CD₀)) +
+      Adv D₀ D₁ (A ∘ (CK₁ || ID ED)) +
+      Adv K₀ K₁ (A ∘ (ID EK || CD₁)).
   Proof.
     intros CD₀ CD₁ CK₀ CK₁ A.
     intros.
-    advantage_trans (dlink (dpar CK₁ CD₁) KEY).
+    advantage_trans ((CK₁ || CD₁) ∘ KEY).
     eapply lerD.
     - eapply @single_key_a. all: eauto.
     (* De-idealising the core keying package *)
-    - erewrite AdvantageD_sym.
-      erewrite -> (@AdvantageD_dpar_dlink_l _ _ _ _ _ _ _ _ _ (ISET :|: IGEN) IGET)
+    - erewrite Adv_sym.
+      erewrite -> (@Adv_par_link_l _ _ _ _ _ _ _ _ _ (ISET :|: IGEN) IGET)
         ; dprove_valid.
   Qed.
 
@@ -615,7 +617,7 @@ Section KEMDEM.
     MOD_CCA_loc :|: KEM_loc :|: DEM_loc :|: KEY_loc.
 
   Definition Aux b :=
-    nom_link (MOD_CCA KEM_DEM) (nom_link (nom_par (KEM true) (DEM b)) KEY).
+    (MOD_CCA KEM_DEM ∘ (((KEM true) || (DEM b)) ∘ KEY))%share.
 
   #[local] Hint Unfold MOD_CCA_in : in_fset_eq.
 
@@ -885,25 +887,21 @@ Section KEMDEM.
   (** Security theorem *)
 
   Theorem PKE_security :
-    ∀ {LA} (A : nom_package),
-      ValidPackage LA PKE_CCA_out A_export A →
-      AdvantageP (PKE_CCA KEM_DEM) A <=
-      AdvantageP KEM_CCA (dlink A
-        (dlink (MOD_CCA KEM_DEM) (dpar (nom_ID KEM_out) (DEM true)))) +
-      AdvantageP DEM_CCA (dlink A
-        (dlink (MOD_CCA KEM_DEM) (dpar (KEM false) (nom_ID DEM_out)))) +
-      AdvantageP KEM_CCA (dlink A
-        (dlink (MOD_CCA KEM_DEM) (dpar (nom_ID KEM_out) (DEM false)))).
+    ∀ {LA} (A : module LA PKE_CCA_out A_export),
+      AdvFor (PKE_CCA KEM_DEM) A <=
+      AdvFor KEM_CCA (A ∘ (MOD_CCA KEM_DEM ∘ (ID KEM_out || DEM true))) +
+      AdvFor DEM_CCA (A ∘ (MOD_CCA KEM_DEM ∘ (KEM false || ID DEM_out))) +
+      AdvFor KEM_CCA (A ∘ (MOD_CCA KEM_DEM ∘ (ID KEM_out || DEM false))).
   Proof.
-    intros LA A VA.
-    unfold AdvantageP.
-    erewrite (AdvantageD_perf_l (PKE_CCA_perf true)).
-    erewrite (AdvantageD_perf_r (PKE_CCA_perf false)).
+    intros LA A.
+    unfold AdvFor.
+    erewrite (Adv_perf_l (PKE_CCA_perf true)).
+    erewrite (Adv_perf_r (PKE_CCA_perf false)).
     unfold Aux; dprove_convert.
-    erewrite AdvantageD_dlink.
+    erewrite Adv_sep_link.
     eapply le_trans.
     + eapply (single_key_b _ _ _ (KEM false)).
       all: dprove_valid.
-    + by erewrite dlink_assoc, dlink_assoc, dlink_assoc.
+    + by erewrite sep_link_assoc, sep_link_assoc, sep_link_assoc.
   Qed.
 End KEMDEM.

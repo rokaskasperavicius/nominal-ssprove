@@ -90,7 +90,7 @@ Theorem schnorr_Correct : Adv_Correct raw_schnorr (λ _, 0).
 Proof.
   intros A VA.
   apply eq_ler.
-  eapply AdvantageD_perf; [| apply VA ].
+  eapply Adv_perf; [| apply VA ].
   eapply (eq_rel_perf_ind _ _ _ heap_ignore_locs).
   simplify_eq_rel hwe.
   move: hwe => [[h w] e].
@@ -122,7 +122,7 @@ Theorem schnorr_SHVZK : Adv_SHVZK raw_schnorr (λ _, 0).
 Proof.
   intros A VA.
   apply eq_ler.
-  eapply AdvantageD_perf; [| apply VA ].
+  eapply Adv_perf; [| apply VA ].
   eapply (eq_rel_perf_ind _ _ _ heap_ignore_locs).
   simplify_eq_rel hwe.
   destruct hwe as [[h w] e].
@@ -148,7 +148,7 @@ Lemma schnorr_Special_Soundness : Adv_Special_Soundness raw_schnorr (λ _, 0).
 Proof.
   intros A VA.
   apply eq_ler.
-  eapply AdvantageD_perf; [| apply VA ].
+  eapply Adv_perf; [| apply VA ].
   eapply eq_rel_perf_ind_eq.
   simplify_eq_rel h.
   destruct h as [[h R] [[e1 z1] [e2 z2]]].
