@@ -70,6 +70,7 @@
         devShells.default = pkgs.stdenv.mkDerivation {
           name = "nominal-ssprove-shell";
           buildInputs = [
+            pkgs.glibcLocales
             pkgs.coqPackages_8_19.coq
             pkgs.coqPackages_8_19.ssprove
             pkgs.coqPackages_8_19.coqide
