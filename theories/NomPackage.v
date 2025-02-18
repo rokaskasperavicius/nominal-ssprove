@@ -557,16 +557,18 @@ Ltac dprove_trimmed :=
   (try apply trimmed_empty_package) ||
   ((apply trimmed_link || apply trimmed_package_cons); dprove_trimmed).
 
-Record module L I E :=
-  { module_package : package L I E
+Record module I E :=
+  { module_locs : {fset Location}
+  ; module_package : package module_locs I E
   ; module_trimmed : trimmed E (pack module_package)
   }.
 
-Arguments module_package {L I E}.
-Arguments module_trimmed {L I E}.
-Arguments Build_module {_ _ _} & _ _.
+Arguments module_locs {I E}.
+Arguments module_package {I E}.
+Arguments module_trimmed {I E}.
+Arguments Build_module {_ _} & _ _ _.
 
-Definition mod {L I E} : module L I E → raw_module
+Definition mod {I E} : module I E → raw_module
   := λ t, module_from_trimmed (pack (module_package t)) (module_trimmed t).
 
 (* There is no coercion through package as it makes
@@ -574,19 +576,22 @@ Definition mod {L I E} : module L I E → raw_module
 Coercion mod : module >-> raw_module.
 
 #[export]
-Instance module_valid {L I E} {P : module L I E} : ValidPackage L I E P.
+Instance module_valid {I E} {P : module I E}
+  : ValidPackage P.(module_locs) I E P.
 Proof. apply module_package. Qed.
 
 #[export]
 Hint Rewrite @s_share_par @s_share_link @imfset_fset @map_cons : in_fset_eq.
 
 
-Notation is_module P := (Build_module P%pack (ltac:(dprove_trimmed)))
-  (only parsing).
+Notation no_locs := (fset0 : {fset Location}).
 
+Notation game E := (module Game_import E).
 
-Notation "[ 'module' ]" :=
-  (Build_module
+Notation adversary I := (module I A_export).
+
+Notation "[ 'module' L ]" :=
+  (Build_module L
     (mkpackage (mkfmap [::]) _)
     ltac:(dprove_trimmed)
   )
@@ -594,8 +599,8 @@ Notation "[ 'module' ]" :=
   , only parsing )
   : package_scope.
 
-Notation "[ 'module' x1 ]" :=
-  (Build_module
+Notation "[ 'module' L ; x1 ]" :=
+  (Build_module L
     (mkpackage (mkfmap (x1 :: [::])) _)
     ltac:(dprove_trimmed)
   )
@@ -604,8 +609,8 @@ Notation "[ 'module' x1 ]" :=
   , only parsing )
   : package_scope.
 
-Notation "[ 'module' x1 ; x2 ; .. ; xn ]" :=
-  (Build_module
+Notation "[ 'module' L ; x1 ; x2 ; .. ; xn ]" :=
+  (Build_module L
     (mkpackage (mkfmap (x1 :: x2 :: .. [:: xn] ..)) _)
     ltac:(dprove_trimmed)
   )

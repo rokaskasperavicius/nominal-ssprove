@@ -85,8 +85,8 @@ Definition RED_loc :=
   fset [:: stop_loc ].
 
 Definition RED :
-  module RED_loc I_DDH (I_PK_OTSR elgamal) :=
-  [module
+  module I_DDH (I_PK_OTSR elgamal) :=
+  [module RED_loc ;
     #def #[ GET ] (_ : 'unit) : 'el {
       #import {sig #[ ONE ] : 'unit → 'el } as ONE ;;
       getNone stop_loc ;;
@@ -105,12 +105,20 @@ Definition RED :
 #[export] Instance valid_RED_DDH0
   : ValidPackage (RED_loc :|: DDH0_loc)
       Game_import (I_PK_OTSR elgamal) (RED ∘ DDH0)%share.
-Proof. dprove_valid. Qed.
+Proof.
+  eapply valid_package_inject_locations.
+  2: dprove_valid.
+  1: fset_solve.
+Qed.
 
 #[export] Instance valid_RED_DDH1
   : ValidPackage (RED_loc :|: DDH1_loc)
       Game_import (I_PK_OTSR elgamal) (RED ∘ DDH1)%share.
-Proof. dprove_valid. Qed.
+Proof.
+  eapply valid_package_inject_locations.
+  2: dprove_valid.
+  1: fset_solve.
+Qed.
 
 #[local] Hint Unfold DDH0_loc DDH1_loc PK_OTSR_loc RED_loc : in_fset_eq.
 
@@ -331,8 +339,8 @@ Proof.
     rewrite //= I2 I3 //.
 Qed.
 
-Theorem elgamal_sound {LA : {fset Location}}
-  : ∀ (A : module LA (I_PK_OTSR elgamal) A_export),
+Theorem elgamal_sound
+  : ∀ A : adversary (I_PK_OTSR elgamal),
   AdvFor (PK_OTSR elgamal) A = AdvFor DDH (A ∘ RED).
 Proof.
   intros A.

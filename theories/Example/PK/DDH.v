@@ -109,8 +109,8 @@ Definition DDH0_loc := fset [:: mga_loc ].
 Definition DDH1_loc := fset [:: init_loc ].
 
 Definition DDH0 :
-  module DDH0_loc Game_import I_DDH :=
-  [module
+  game I_DDH :=
+  [module DDH0_loc ;
     #def #[ ONE ] ('tt : 'unit) : 'el {
       a ← sample uniform #|exp| ;;
       #put mga_loc := Some (op_exp op_g a) ;;
@@ -125,8 +125,8 @@ Definition DDH0 :
   ].
 
 Definition DDH1 :
-  module DDH1_loc Game_import I_DDH :=
-  [module
+  game I_DDH :=
+  [module DDH1_loc ;
     #def #[ ONE ] ('tt : 'unit) : 'el {
       a ← sample uniform #|exp| ;;
       #put init_loc := Some tt ;;
@@ -141,7 +141,6 @@ Definition DDH1 :
     }
   ].
 
-Definition DDH b :=
-  if b then DDH0 : raw_module else DDH1.
+Definition DDH b := if b then DDH0 else DDH1.
 
 End DDH.

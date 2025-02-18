@@ -417,7 +417,7 @@ Qed.
 
 Definition Pr' : raw_module → R := λ P, Pr P true.
 
-Definition Adv (G G' A : raw_module)
+Definition Adv (G G' A : raw_module) : R
   := `| Pr' (A ∘ G) - Pr' (A ∘ G')|.
 
 Add Parametric Morphism : val with
@@ -554,10 +554,10 @@ Ltac advantage_trans M :=
     [ eapply (@Adv_triangle _ M) |].
 
 Lemma Adv_same (G A : raw_module) : Adv G G A = 0.
-Proof. rewrite /Adv addrN. apply normr0. Qed.
+Proof. rewrite /Adv addrN. rewrite normr0 //. Qed.
 
 Lemma Adv_sym (G G' A : raw_module) : Adv G G' A = Adv G' G A.
-Proof. apply distrC. Qed.
+Proof. apply: distrC. Qed.
 
 Lemma Adv_alpha (G G' A : raw_module)
   : G ≡ G' → Adv G G' A = 0.
@@ -891,6 +891,10 @@ Ltac dprove_valid :=
   dprove_rec ;
   try (fset_solve; fail).
 
+Notation "{ 'module' m }" :=
+  (Build_module (loc m%sep) (mkpackage m%sep _) _)
+  (only parsing) : sep_scope.
+
 
 Lemma valid_idents {L I E} P {V : ValidPackage L I E P} : fsubset (idents E) (domm P).
 Proof.
@@ -1100,4 +1104,4 @@ Proof.
 Qed.
 
 
-Definition AdvFor GG A := Adv (GG true) (GG false) A.
+Definition AdvFor GG A : R := Adv (GG true) (GG false) A.

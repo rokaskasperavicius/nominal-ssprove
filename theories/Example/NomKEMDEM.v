@@ -224,8 +224,8 @@ Section KEMDEM.
     ].
 
   (** Definition of the KEY package *)
-  Definition KEY : module KEY_loc [interface] KEY_out :=
-    [module
+  Definition KEY : game KEY_out :=
+    [module KEY_loc ;
       #def #[ GEN ] (_ : 'unit) : 'unit {
         k ← get k_loc ;;
         #assert (k == None) ;;
@@ -274,8 +274,8 @@ Section KEMDEM.
       #val #[ DECAP ] : 'ekey → 'key
     ].
 
-  Definition KEM (b : bool) : module KEM_loc (KEM_in b) KEM_out :=
-    [module
+  Definition KEM (b : bool) : module (KEM_in b) KEM_out :=
+    [module KEM_loc ;
       #def #[ KEMGEN ] (_ : 'unit) : 'pkey {
         sk ← get sk_loc ;;
         #assert (sk == None) ;;
@@ -368,8 +368,8 @@ Section KEMDEM.
       #val #[ DEC ] : 'cipher → 'plain
     ].
 
-  Definition DEM (b : bool) : module DEM_loc DEM_in DEM_out :=
-    [module
+  Definition DEM (b : bool) : module DEM_in DEM_out :=
+    [module DEM_loc ;
       #def #[ ENC ] (m : 'plain) : 'cipher {
         #import {sig #[ GET ] : 'unit → 'key } as GET ;;
         c ← get c_loc ;;
@@ -430,9 +430,8 @@ Section KEMDEM.
       #val #[ PKDEC ] : 'ekey × 'cipher → 'plain
     ].
 
-  Definition PKE_CCA (ζ : PKE_scheme) b :
-    module PKE_CCA_loc Game_import PKE_CCA_out :=
-    [module
+  Definition PKE_CCA (ζ : PKE_scheme) b : game PKE_CCA_out :=
+    [module PKE_CCA_loc ;
       #def #[ PKGEN ] (_ : 'unit) : 'pkey {
         sk ← get sk_loc ;;
         #assert (sk == None) ;;
@@ -483,8 +482,8 @@ Section KEMDEM.
     PKE_CCA_out.
 
   Definition MOD_CCA (ζ : PKE_scheme) :
-    module MOD_CCA_loc MOD_CCA_in MOD_CCA_out :=
-    [module
+    module MOD_CCA_in MOD_CCA_out :=
+    [module MOD_CCA_loc ;
       #def #[ PKGEN ] (_ : 'unit) : 'pkey {
         #import {sig #[ KEMGEN ] : 'unit → 'pkey } as KEMGEN ;;
         pk ← get pk_m_loc ;;
@@ -544,11 +543,11 @@ Section KEMDEM.
   (** Single key lemma *)
 
   (** Corresponds to Lemma 19.a in the SSP paper *)
-  Lemma single_key_a {LD₀ LD₁ LK₀ LK₁} {EK ED}:
-    ∀ (CD₀ : module LD₀ IGET ED)
-      (CD₁ : module LD₁ IGET ED)
-      (CK₀ : module LK₀ ISET EK)
-      (CK₁ : module LK₁ IGEN EK)
+  Lemma single_key_a {EK ED}:
+    ∀ (CD₀ : module IGET ED)
+      (CD₁ : module IGET ED)
+      (CK₀ : module ISET EK)
+      (CK₁ : module IGEN EK)
       (A : raw_module),
       let K₀ := (CK₀ || ID IGET) ∘ KEY in
       let K₁ := (CK₁ || ID IGET) ∘ KEY in
@@ -574,11 +573,11 @@ Section KEMDEM.
   Qed.
 
   (** Corresponds to Lemma 19.b in the SSP paper *)
-  Lemma single_key_b {LD₀ LD₁ LK₀ LK₁} {EK ED} :
-    ∀ (CD₀ : module LD₀ IGET ED)
-      (CD₁ : module LD₁ IGET ED)
-      (CK₀ : module LK₀ ISET EK)
-      (CK₁ : module LK₁ IGEN EK)
+  Lemma single_key_b  {EK ED} :
+    ∀ (CD₀ : module IGET ED)
+      (CD₁ : module IGET ED)
+      (CK₀ : module ISET EK)
+      (CK₁ : module IGEN EK)
       (A : raw_module),
       let K₀ := (CK₀ || ID IGET) ∘ KEY in
       let K₁ := (CK₁ || ID IGET) ∘ KEY in
@@ -885,15 +884,18 @@ Section KEMDEM.
 
 
   (** Security theorem *)
+Hint Extern 5 (is_true (disj _ _)) =>
+  rewrite /disj !supp_mod //=; fset_solve
+  : disj_db.
 
   Theorem PKE_security :
-    ∀ {LA} (A : module LA PKE_CCA_out A_export),
+    ∀ (A : module PKE_CCA_out A_export),
       AdvFor (PKE_CCA KEM_DEM) A <=
       AdvFor KEM_CCA (A ∘ (MOD_CCA KEM_DEM ∘ (ID KEM_out || DEM true))) +
       AdvFor DEM_CCA (A ∘ (MOD_CCA KEM_DEM ∘ (KEM false || ID DEM_out))) +
       AdvFor KEM_CCA (A ∘ (MOD_CCA KEM_DEM ∘ (ID KEM_out || DEM false))).
   Proof.
-    intros LA A.
+    intros A.
     unfold AdvFor.
     erewrite (Adv_perf_l (PKE_CCA_perf true)).
     erewrite (Adv_perf_r (PKE_CCA_perf false)).

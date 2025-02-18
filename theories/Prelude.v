@@ -98,8 +98,8 @@ Proof. rewrite /rename /= imfset0 //. Qed.
 #[export] Hint Rewrite <- @supp_equi : in_fset_eq.
 #[export] Hint Rewrite @rename_fset0 @supp0 : in_fset_eq.
 
-Lemma supp_mod {L I E} (P : module L I E)
-  : supp (mod P) = supp L.
+Lemma supp_mod {I E} (P : module I E)
+  : supp (mod P) = supp (module_locs P).
 Proof.
   done.
 Qed.
@@ -114,11 +114,48 @@ Proof. done. Qed.
 
 #[export] Hint Rewrite @s_share_par @s_share_link : in_fset_eq.
 
+Create HintDb disj_db.
+#[export] Hint Resolve disj_share_link disj_share_link2 : disj_db.
+#[export] Hint Resolve disj_ID_r disj_ID_l : disj_db.
+
+Lemma disj_par_link {X : nomType} {P Q} {x : X}
+  : disj x P → disj x Q → disj x (P || Q)%share.
+Proof.
+  apply disj_equi2, equi_share_par.
+Qed.
+
+Lemma disj_par_link2 {X : nomType} {P Q} {x : X}
+  : disj P x → disj Q x → disj (P || Q)%share x.
+Proof.
+  rewrite disjC (disjC Q x).
+  apply disj_equi2', equi_share_par.
+Qed.
+
+#[export] Hint Resolve disj_par_link disj_par_link2 : disj_db.
+
+
+Ltac dprove_abstract :=
+  match goal with
+  | [ H : is_true (disj _ _) |- _ ] => move: H; dprove_abstract
+  | _ => idtac (*unfold disj; fset_solve*)
+  end.
+
+#[export] Hint Extern 5 (is_true (disj _ _)) =>
+  dprove_abstract;
+  unfold disj;
+  repeat rewrite -supp_equi;
+  rewrite !supp_mod //=;
+  fset_solve
+  : disj_db.
+
 Ltac dprove_convert_solve :=
+  auto with disj_db nocore.
+(*
   match goal with
   | [ H : is_true (disj _ _) |- _ ] => move: H; dprove_convert_solve
-  | _ => unfold disj; fset_solve
+  | _ => auto with disj_db (*unfold disj; fset_solve*)
   end.
+ *)
 
 Ltac dprove_convert_once :=
   (rewrite -> share_link_sep_link by dprove_convert_solve)

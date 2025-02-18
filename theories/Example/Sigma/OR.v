@@ -158,9 +158,9 @@ Equations raw_or p : raw_sigma :=
 
 Definition Aux n m S T :=
   (@Build_module
-    fset0
     (fset ((m, (S, T)) :: [::]))
     (fset ((n, (S, T)) :: [::]))
+    fset0
     (mkpackage (mkfmap ( 
       (n, mkdef S T
         (λ x, opr (m, (S, T)) x (λ y, ret y))
@@ -185,13 +185,13 @@ Definition AuxR p :=
   ).
 
 #[tactic=ssprove_valid] Equations SHVZK_call p :
-  module fset0
+  module
     [interface
        #val #[ LEFT ] : ('input p.(left)) → 'transcript p.(left) ;
        #val #[ RIGHT ] : ('input p.(right)) → 'transcript p.(right)
     ]
     [interface #val #[ TRANSCRIPT ] : ('input (raw_or p)) → 'transcript (raw_or p)] :=
-  SHVZK_call p := [module
+  SHVZK_call p := [module no_locs ;
     #def #[ TRANSCRIPT ] (hwe : 'input (raw_or p)) : ('transcript (raw_or p)) {
       #import {sig #[ LEFT ] :
         ('input p.(left)) → 'transcript p.(left)} as LeftTranscript ;;
@@ -427,11 +427,32 @@ Proof.
     by eapply r_ret.
 Qed.
 
-Definition A_left p A : raw_module :=
-  ((A ∘ SHVZK_call p) ∘ (AuxL p || (AuxR p ∘ SHVZK_real (right p)))).
 
-Definition A_right p A : raw_module :=
-  ((A ∘ SHVZK_call p) ∘ ((AuxL p ∘ SHVZK_ideal (left p)) || AuxR p)).
+Local Obligation Tactic := notac.
+
+Program Definition A_left p (A : adversary (Transcript (raw_or p)))
+  : adversary (Transcript (left p)) :=
+  {module ((A ∘ SHVZK_call p) ∘ (AuxL p || (AuxR p ∘ SHVZK_real (right p)))) }.
+Obligation 1.
+  intros p A. dprove_valid.
+Qed.
+Obligation 2.
+  intros p A.
+  do 2 apply trimmed_link.
+  apply module_trimmed.
+Qed.
+
+Program Definition A_right p (A : adversary (Transcript (raw_or p)))
+  : adversary (Transcript (right p)) :=
+  {module ((A ∘ SHVZK_call p) ∘ ((AuxL p ∘ SHVZK_ideal (left p)) || AuxR p)) }.
+Obligation 1.
+  intros p A. dprove_valid.
+Qed.
+Obligation 2.
+  intros p A.
+  do 2 apply trimmed_link.
+  apply module_trimmed.
+Qed.
 
 
 Lemma d_left_right p : disj (l p ∙ p.(left).(locs)) (r p ∙ p.(right).(locs)).
@@ -444,7 +465,7 @@ Theorem OR_SHVZK p :
     Adv_SHVZK p.(right) ε₂ →
     Adv_SHVZK (raw_or p) (λ A, ε₁ (A_left p A) + ε₂ (A_right p A)).
 Proof.
-  intros ε₀ ε₁ AdvL AdvR A VA.
+  intros ε₀ ε₁ AdvL AdvR A.
   unfold AdvFor, SHVZK.
   erewrite (Adv_perf_l (commit_call p)).
   erewrite <- (Adv_perf_r (simulate_call p)).
@@ -460,17 +481,13 @@ Proof.
     rewrite Adv_sep_link.
     erewrite @sep_par_game_l, @sep_par_game_l; try dprove_valid.
     rewrite Adv_sep_link.
-    apply AdvL.
-    unfold A_left.
-    dprove_valid.
+    apply (AdvL (A_left p A)).
 
   + move: (d_right p) => {}H; dprove_convert.
     rewrite Adv_sep_link.
     erewrite @sep_par_game_r, @sep_par_game_r; try dprove_valid.
     rewrite Adv_sep_link.
-    apply AdvR.
-    unfold A_right.
-    dprove_valid.
+    apply (AdvR (A_right p A)).
 Qed.
 
 End SigmaOR.

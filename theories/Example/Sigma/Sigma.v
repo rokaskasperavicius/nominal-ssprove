@@ -106,8 +106,8 @@ Definition ICorrect p :=
   [interface #val #[ RUN ] : ('input p) → 'bool ].
 
 Definition Correct_real p :
-  module p.(locs) Game_import (ICorrect p) :=
-  [module
+  game (ICorrect p) :=
+  [module p.(locs) ;
     #def #[ RUN ] ('(h, w, e) : 'input p) : 'bool {
       #assert p.(R) h w ;;
       a ← p.(commit) h w ;;
@@ -117,8 +117,8 @@ Definition Correct_real p :
   ].
 
 Definition Correct_ideal p :
-  module fset0 Game_import (ICorrect p) :=
-  [module
+  game (ICorrect p) :=
+  [module no_locs ;
     #def #[ RUN ] ('(h, w, e) : 'input p) : 'bool {
       #assert p.(R) h w ;;
       @ret 'bool true
@@ -126,13 +126,11 @@ Definition Correct_ideal p :
   ].
 
 Definition Correct p b :=
-  if b then Correct_real p : raw_module else Correct_ideal p.
+  if b then Correct_real p else Correct_ideal p.
 
 (* Main security statement for Special Honest-Verifier Zero-Knowledge. *)
-Definition Adv_Correct p ε :=
-  ∀ (A : raw_module),
-  ValidPackage (loc A) (ICorrect p) A_export A →
-  AdvFor (Correct p) A <= ε A.
+Definition Adv_Correct p (ε : adversary (ICorrect p) → Axioms.R) :=
+  ∀ A : adversary (ICorrect p), AdvFor (Correct p) A <= ε A.
 
 
 (* Section: SHVZK *)
@@ -148,8 +146,8 @@ Notation Transcript p :=
   [interface #val #[ TRANSCRIPT ] : ('input p) → 'transcript p ].
 
 Definition SHVZK_real p :
-  module p.(locs) Game_import (Transcript p) :=
-  [module
+  game (Transcript p) :=
+  [module p.(locs) ;
     #def #[ TRANSCRIPT ] ('(h, w, e) : 'input p) : ('transcript p) {
       #assert p.(R) h w ;;
       a ← p.(commit) h w ;;
@@ -159,8 +157,8 @@ Definition SHVZK_real p :
   ].
 
 Definition SHVZK_ideal p :
-  module fset0 Game_import (Transcript p) :=
-  [module
+  game (Transcript p) :=
+  [module no_locs ;
     #def #[ TRANSCRIPT ] ('(h, w, e) : 'input p) : ('transcript p) {
       #assert p.(R) h w ;;
       '(a, z) ← p.(simulate) h e ;;
@@ -169,19 +167,17 @@ Definition SHVZK_ideal p :
   ].
 
 Definition SHVZK p b :=
-  if b then SHVZK_real p : raw_module else SHVZK_ideal p.
+  if b then SHVZK_real p else SHVZK_ideal p.
 
-Definition Adv_SHVZK p ε :=
-  ∀ (A : raw_module),
-  ValidPackage (loc A) (Transcript p) A_export A →
-  AdvFor (SHVZK p) A <= ε A.
+Definition Adv_SHVZK p (ε : adversary (Transcript p) → Axioms.R) :=
+  ∀ A : adversary (Transcript p), AdvFor (SHVZK p) A <= ε A.
 
 
 (* Section: Relating SHVZK and correctness *)
 
 Definition Verify_call p :
-  module fset0 (Transcript p) (ICorrect p) :=
-  [module
+  module (Transcript p) (ICorrect p) :=
+  [module no_locs ;
     #def #[ RUN ] ('(h, w, e) : 'input p) : 'bool {
       #import {sig #[ TRANSCRIPT ] : ('input p) → 'transcript p} as Transcript ;;
       '(h, a, e, z) ← Transcript (h, w, e) ;;
@@ -189,12 +185,11 @@ Definition Verify_call p :
     }
   ].
 
-Lemma Verify_SHVZK_Correct_perf {LA} p (A : raw_module)
-  (VA : ValidPackage LA (ICorrect p) A_export A)
+Lemma Verify_SHVZK_Correct_perf p (A : adversary (ICorrect p))
   : Adv (Verify_call p ∘ SHVZK_real p) (Correct_real p) A = 0.
 Proof.
   rewrite -share_link_sep_link; [| dprove_convert_solve ].
-  eapply Adv_perf; [| exact VA ].
+  eapply Adv_perf; [| exact module_valid ].
   eapply eq_rel_perf_ind_eq.
   simplify_eq_rel hwe.
   ssprove_code_simpl; rewrite cast_fun_K.
@@ -209,12 +204,10 @@ Qed.
 
 Definition Correct_sim p : raw_module := Verify_call p ∘ SHVZK_ideal p.
 
-Lemma Adv_Correct_sim p (A : raw_module) :
-  ∀ (VA : ValidPackage (loc A) (ICorrect p) A_export A),
+Lemma Adv_Correct_sim p (A : adversary (ICorrect p)) :
   Adv (Correct_sim p) (Correct_ideal p) A
     <= AdvFor (SHVZK p) (A ∘ Verify_call p) + AdvFor (Correct p) A.
 Proof.
-  intros VA.
   advantage_trans (Verify_call p ∘ SHVZK_real p)%sep.
   apply lerD.
   + rewrite Adv_sep_link Adv_sym.
@@ -224,7 +217,6 @@ Proof.
     rewrite GRing.add0r.
     apply le_refl.
 Qed.
-
 
 (* Section: 2-special-soundness *)
 
@@ -239,8 +231,8 @@ Notation Soundness p :=
   [interface #val #[ SOUNDNESS ] : ('soundness p) → 'bool ].
 
 Definition Special_Soundness_f p :
-  module fset0 Game_import (Soundness p) :=
-  [module
+  game (Soundness p) :=
+  [module no_locs ;
     #def #[ SOUNDNESS ] ('((h, a), ((e, z), (e', z'))) : 'soundness p) : 'bool {
       #assert p.(verify) h a e z ;;
       #assert p.(verify) h a e' z' ;;
@@ -251,8 +243,8 @@ Definition Special_Soundness_f p :
   ].
 
 Definition Special_Soundness_t p :
-  module fset0 Game_import (Soundness p) :=
-  [module
+  game (Soundness p) :=
+  [module no_locs ;
     #def #[ SOUNDNESS ] ('((h, a), ((e, z), (e', z'))) : 'soundness p) : 'bool {
       #assert p.(verify) h a e z ;;
       #assert p.(verify) h a e' z' ;;
@@ -262,9 +254,7 @@ Definition Special_Soundness_t p :
   ].
 
 Definition Special_Soundness p b :=
-  if b then Special_Soundness_t p : raw_module else Special_Soundness_f p.
+  if b then Special_Soundness_t p else Special_Soundness_f p.
 
-Definition Adv_Special_Soundness p ε :=
-  ∀ (A : raw_module),
-  ValidPackage (loc A) (Soundness p) A_export A →
-  AdvFor (Special_Soundness p) A <= ε A.
+Definition Adv_Special_Soundness p (ε : adversary (Soundness p) → Axioms.R) :=
+  ∀ A : adversary (Soundness p), AdvFor (Special_Soundness p) A <= ε A.
