@@ -224,7 +224,7 @@ Definition CALL p (L R : raw_module) : raw_module :=
     ValidPackage R.(loc) [interface] (Transcript p.(right)) R →
     ValidPackage (CALL p L R).(loc) [interface] (Transcript (raw_or p))
       (CALL p L R).
-Proof. move => L R VL VR. unfold CALL. dprove_valid. Qed.
+Proof. move => L R VL VR. unfold CALL. nssprove_valid. Qed.
 
 Lemma destruct_let_pair : ∀ A B C (xy : A * B) (f : A → B → C), (let (x, y) := xy in f x y) = f xy.1 xy.2.
 Proof.
@@ -434,7 +434,7 @@ Program Definition A_left p (A : adversary (Transcript (raw_or p)))
   : adversary (Transcript (left p)) :=
   {module ((A ∘ SHVZK_call p) ∘ (AuxL p || (AuxR p ∘ SHVZK_real (right p)))) }.
 Obligation 1.
-  intros p A. dprove_valid.
+  intros p A. nssprove_valid.
 Qed.
 Obligation 2.
   intros p A.
@@ -446,7 +446,7 @@ Program Definition A_right p (A : adversary (Transcript (raw_or p)))
   : adversary (Transcript (right p)) :=
   {module ((A ∘ SHVZK_call p) ∘ ((AuxL p ∘ SHVZK_ideal (left p)) || AuxR p)) }.
 Obligation 1.
-  intros p A. dprove_valid.
+  intros p A. nssprove_valid.
 Qed.
 Obligation 2.
   intros p A.
@@ -471,21 +471,21 @@ Proof.
   erewrite <- (Adv_perf_r (simulate_call p)).
 
   unfold call_real_real, call_ideal_ideal, CALL.
-  move: (d_left_right p) => H; dprove_convert.
+  move: (d_left_right p) => H; nssprove_separate.
 
-  advantage_trans (call_ideal_real p).
+  nssprove_adv_trans (call_ideal_real p).
 
   apply lerD.
   1,2: unfold call_ideal_real, CALL.
-  + move: (d_left p) => {}H; dprove_convert.
+  + move: (d_left p) => {}H; nssprove_separate.
     rewrite Adv_sep_link.
-    erewrite @sep_par_game_l, @sep_par_game_l; try dprove_valid.
+    erewrite @sep_par_game_l, @sep_par_game_l; try nssprove_valid.
     rewrite Adv_sep_link.
     apply (AdvL (A_left p A)).
 
-  + move: (d_right p) => {}H; dprove_convert.
+  + move: (d_right p) => {}H; nssprove_separate.
     rewrite Adv_sep_link.
-    erewrite @sep_par_game_r, @sep_par_game_r; try dprove_valid.
+    erewrite @sep_par_game_r, @sep_par_game_r; try nssprove_valid.
     rewrite Adv_sep_link.
     apply (AdvR (A_right p A)).
 Qed.

@@ -545,11 +545,11 @@ Lemma Adv_triangle {G1 G2 G3 : raw_module} A
   : Adv G1 G3 A <= Adv G1 G2 A + Adv G2 G3 A.
 Proof. unfold Adv, Pr'. apply Advantage_triangle. Qed.
 
-Ltac eadvantage_trans :=
+Ltac nssprove_eadv_trans :=
   eapply le_trans;
     [ eapply Adv_triangle |].
 
-Ltac advantage_trans M :=
+Ltac nssprove_adv_trans M :=
   eapply le_trans;
     [ eapply (@Adv_triangle _ M) |].
 
@@ -727,11 +727,11 @@ Proof.
   intros Indish.
   apply le_anti.
   apply /andP; split.
-  - eadvantage_trans.
+  - nssprove_eadv_trans.
     erewrite (Adv_perf Indish).
     + rewrite GRing.add0r //.
     + eassumption.
-  - eadvantage_trans.
+  - nssprove_eadv_trans.
     erewrite (Adv_perf (adv_equiv_sym _ _ _ _ _ _ _ _ Indish)).
     + rewrite GRing.add0r //.
     + eassumption.
@@ -819,20 +819,20 @@ Lemma Parable_ID_r {E p}
   : Parable p (pkg_composition.ID E) → Parable p (ID E).
 Proof. done. Qed.
 
-Ltac dprove_rec :=
+Ltac nssprove_rec :=
   lazymatch goal with
   | |- (ValidPackage ?L ?I ?E (val ?P)) =>
       tryif assert_fails (is_evar I)
-        then (eapply valid_package_inject_import; dprove_rec) else
+        then (eapply valid_package_inject_import; nssprove_rec) else
       tryif assert_fails (is_evar E)
-        then (eapply valid_package_inject_export; dprove_rec) else
+        then (eapply valid_package_inject_export; nssprove_rec) else
       lazymatch P with
-      | (share_link ?P1 ?P2) => eapply valid_link; dprove_rec
-      | (share_par ?P1 ?P2) => eapply valid_par; dprove_rec
-      | (sep_link ?P1 ?P2) => eapply sep_link_valid; dprove_rec
-      | (sep_par ?P1 ?P2) => eapply sep_par_valid; dprove_rec
-      | (ID ?I1) => eapply ID_valid; dprove_rec
-      | (rename ?pi ?P1) => eapply rename_valid; dprove_rec
+      | (share_link ?P1 ?P2) => eapply valid_link; nssprove_rec
+      | (share_par ?P1 ?P2) => eapply valid_par; nssprove_rec
+      | (sep_link ?P1 ?P2) => eapply sep_link_valid; nssprove_rec
+      | (sep_par ?P1 ?P2) => eapply sep_par_valid; nssprove_rec
+      | (ID ?I1) => eapply ID_valid; nssprove_rec
+      | (rename ?pi ?P1) => eapply rename_valid; nssprove_rec
       | (mod ?P1) => eapply module_valid
           (* | (nom (pack ?P1)) => apply pack_valid
       | (nom ?P1) => apply nom_valid
@@ -844,14 +844,14 @@ Ltac dprove_rec :=
   | |- (ValidPackage ?L ?I ?E (val (sep_link ?P1 ?P2))) =>
       eapply sep_link_valid;
       [ eapply valid_package_inject_export |];
-      dprove_rec
+      nssprove_rec
   | |- (ValidPackage ?L ?I ?E (val (sep_par ?P1 ?P2))) =>
       eapply sep_par_valid_same_import;
       [ | eapply valid_package_inject_import
         | eapply valid_package_inject_import ] ;
-            dprove_rec
+            nssprove_rec
   | |- (ValidPackage ?L ?I ?E (val (ID ?M))) =>
-      eapply ID_valid; dprove_rec
+      eapply ID_valid; nssprove_rec
   | |- (ValidPackage ?L ?I ?E (val (nom ?M))) =>
       apply valid_trim; apply (pack_valid M)
   | |- (ValidPackage ?L ?I ?E (val ?P)) =>
@@ -861,13 +861,13 @@ Ltac dprove_rec :=
   | |- is_true ( fsubset ?A ?B ) =>
       try assumption
   | |- (Parable (val (nom ?P1)) ?P2) =>
-      apply Parable_nom_l ; dprove_rec
+      apply Parable_nom_l ; nssprove_rec
   | |- (Parable ?P1 (val (nom ?P2))) =>
-      apply Parable_nom_r ; dprove_rec
+      apply Parable_nom_r ; nssprove_rec
   | |- (Parable (val (ID ?E1)) ?P2) =>
-      apply Parable_ID_l ; dprove_rec
+      apply Parable_ID_l ; nssprove_rec
   | |- (Parable ?P1 (val (ID ?E2))) =>
-      apply Parable_ID_r ; dprove_rec
+      apply Parable_ID_r ; nssprove_rec
   | |- (Parable ?P1 ?P2) =>
       try (assumption || (apply Parable_commut ; assumption)) ;
       try (unfold Parable; simpl; fset_solve)
@@ -879,16 +879,16 @@ Ltac dprove_rec :=
   | |- (trimmed ?E1 (val (ID ?E2))) =>
       apply trimmed_ID
   | |- (trimmed ?E ?P) =>
-      (try assumption) || (try apply module_trimmed) || dprove_trimmed
+      (try assumption) || (try apply module_trimmed) || nssprove_trimmed
   | |- ?x =>
       done ||
       (* idtac x ; *)
       fail "What do I do with this?"
   end.
     
-Ltac dprove_valid :=
+Ltac nssprove_valid :=
   (* try unfold Game_import ; *)
-  dprove_rec ;
+  nssprove_rec ;
   try (fset_solve; fail).
 
 Notation "{ 'module' m }" :=
@@ -918,7 +918,7 @@ Lemma swish {L L' : {fset Location}} {I I' E E' : Interface} {P P' : raw_module}
 Proof.
   intros V1 V2 V3.
   intros fl tr tr'.
-  erewrite <- sep_interchange; try dprove_valid.
+  erewrite <- sep_interchange; try nssprove_valid.
   rewrite id_sep_link //.
   rewrite sep_link_id //.
   setoid_reflexivity.
@@ -931,7 +931,7 @@ Lemma swash {L L' I I' E E'} {P P' : raw_module} :
 Proof.
   intros V1 V2 V3.
   intros fl tr tr'.
-  erewrite <- sep_interchange; try dprove_valid.
+  erewrite <- sep_interchange; try nssprove_valid.
   rewrite id_sep_link //.
   rewrite sep_link_id //.
   reflexivity.
@@ -996,7 +996,7 @@ Lemma sep_par_game_l {LP LQ LR EP EQ ER IQ} {P Q R : raw_module}
 Proof.
   rewrite -{2}(@sep_par_empty_r Q).
   erewrite <- sep_interchange.
-  2-7: dprove_valid.
+  2-7: nssprove_valid.
   2: apply Parable_Game_import_r.
   rewrite sep_link_id; [ reflexivity | | assumption ].
   apply Game_import_flat.
@@ -1012,7 +1012,7 @@ Lemma sep_par_game_r {LP LQ LR EP EQ ER IQ} {P Q R : raw_module}
 Proof.
   rewrite -{2}(@sep_par_empty_l Q).
   erewrite <- sep_interchange.
-  2-7: dprove_valid.
+  2-7: nssprove_valid.
   2: apply Parable_Game_import_l.
   rewrite sep_link_id; [ reflexivity | | assumption ].
   apply Game_import_flat.
@@ -1034,7 +1034,7 @@ Proof.
   erewrite sep_link_assoc.
   erewrite sep_link_assoc.
   erewrite <- @swish, <- @swish.
-  all: dprove_valid.
+  all: nssprove_valid.
 Qed.
 
 Lemma Adv_par_r (G₀ G₁ G₁' A : raw_module)
@@ -1048,10 +1048,10 @@ Proof.
   intros tr0 tr1 tr2.
   rewrite -Adv_sep_link.
   rewrite swish.
-  2-4: try dprove_valid.
+  2-4: try nssprove_valid.
   rewrite sep_par_empty_l.
   rewrite swish.
-  2-4: try dprove_valid.
+  2-4: try nssprove_valid.
   rewrite sep_par_empty_l.
   reflexivity.
 Qed.
@@ -1081,7 +1081,7 @@ Proof.
   erewrite <- Adv_sep_link.
   erewrite sep_link_assoc, sep_link_assoc.
   erewrite <- @swash, <- @swash.
-  all: dprove_valid.
+  all: nssprove_valid.
 Qed.
 
 Lemma Adv_par_l (G₀ G₀' G₁ A : raw_module) {L₀ L₀'  L₁} {E₀ E₁}
@@ -1095,10 +1095,10 @@ Proof.
   intros tr0 tr1 tr2.
   rewrite -Adv_sep_link.
   rewrite swash.
-  2-4: try dprove_valid.
+  2-4: try nssprove_valid.
   rewrite sep_par_empty_r.
   rewrite swash.
-  2-4: try dprove_valid.
+  2-4: try nssprove_valid.
   rewrite sep_par_empty_r.
   reflexivity.
 Qed.

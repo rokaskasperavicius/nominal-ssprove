@@ -134,37 +134,37 @@ Qed.
 #[export] Hint Resolve disj_par_link disj_par_link2 : disj_db.
 
 
-Ltac dprove_abstract :=
+Ltac nssprove_abstract_help :=
   match goal with
-  | [ H : is_true (disj _ _) |- _ ] => move: H; dprove_abstract
+  | [ H : is_true (disj _ _) |- _ ] => move: H; nssprove_abstract_help
   | _ => idtac (*unfold disj; fset_solve*)
   end.
 
 #[export] Hint Extern 5 (is_true (disj _ _)) =>
-  dprove_abstract;
+  nssprove_abstract_help;
   unfold disj;
   repeat rewrite -supp_equi;
   rewrite !supp_mod //=;
   fset_solve
   : disj_db.
 
-Ltac dprove_convert_solve :=
+Ltac nssprove_separate_solve :=
   auto with disj_db nocore.
 (*
   match goal with
-  | [ H : is_true (disj _ _) |- _ ] => move: H; dprove_convert_solve
+  | [ H : is_true (disj _ _) |- _ ] => move: H; nssprove_separate_solve
   | _ => auto with disj_db (*unfold disj; fset_solve*)
   end.
  *)
 
-Ltac dprove_convert_once :=
-  (rewrite -> share_link_sep_link by dprove_convert_solve)
-  || (rewrite -> share_par_sep_par by dprove_convert_solve)
+Ltac nssprove_separate_once :=
+  (rewrite -> share_link_sep_link by nssprove_separate_solve)
+  || (rewrite -> share_par_sep_par by nssprove_separate_solve)
   || (rewrite -> rename_alpha)
   || reflexivity.
 
-Ltac dprove_convert :=
-  repeat dprove_convert_once.
+Ltac nssprove_separate :=
+  repeat nssprove_separate_once.
 
 
 (* rename simplification *)

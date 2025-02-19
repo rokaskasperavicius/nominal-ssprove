@@ -188,7 +188,7 @@ Definition Verify_call p :
 Lemma Verify_SHVZK_Correct_perf p (A : adversary (ICorrect p))
   : Adv (Verify_call p ∘ SHVZK_real p) (Correct_real p) A = 0.
 Proof.
-  rewrite -share_link_sep_link; [| dprove_convert_solve ].
+  rewrite -share_link_sep_link; [| nssprove_separate_solve ].
   eapply Adv_perf; [| exact module_valid ].
   eapply eq_rel_perf_ind_eq.
   simplify_eq_rel hwe.
@@ -208,11 +208,11 @@ Lemma Adv_Correct_sim p (A : adversary (ICorrect p)) :
   Adv (Correct_sim p) (Correct_ideal p) A
     <= AdvFor (SHVZK p) (A ∘ Verify_call p) + AdvFor (Correct p) A.
 Proof.
-  advantage_trans (Verify_call p ∘ SHVZK_real p)%sep.
+  nssprove_adv_trans (Verify_call p ∘ SHVZK_real p)%sep.
   apply lerD.
   + rewrite Adv_sep_link Adv_sym.
     apply le_refl.
-  + advantage_trans (Correct_real p).
+  + nssprove_adv_trans (Correct_real p).
     rewrite Verify_SHVZK_Correct_perf.
     rewrite GRing.add0r.
     apply le_refl.

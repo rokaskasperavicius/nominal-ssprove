@@ -107,7 +107,7 @@ Definition RED :
       Game_import (I_PK_OTSR elgamal) (RED ∘ DDH0)%share.
 Proof.
   eapply valid_package_inject_locations.
-  2: dprove_valid.
+  2: nssprove_valid.
   1: fset_solve.
 Qed.
 
@@ -116,7 +116,7 @@ Qed.
       Game_import (I_PK_OTSR elgamal) (RED ∘ DDH1)%share.
 Proof.
   eapply valid_package_inject_locations.
-  2: dprove_valid.
+  2: nssprove_valid.
   1: fset_solve.
 Qed.
 
@@ -348,7 +348,7 @@ Proof.
   rewrite (Adv_perf_l pk_ots0_perf).
   rewrite (Adv_perf_r pk_ots1_perf).
   rewrite -Adv_sep_link.
-  dprove_convert.
+  nssprove_separate.
 Qed.
 
 End ElGamal.

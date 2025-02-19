@@ -346,7 +346,7 @@ Section KEMDEM.
     : ValidPackage (loc (KEM_CCA b)) Game_import KEM_CCA_out (KEM_CCA b).
   Proof.
     unfold KEM_CCA.
-    dprove_valid.
+    nssprove_valid.
     destruct b; fset_solve.
   Qed.
 
@@ -415,7 +415,7 @@ Section KEMDEM.
     : ValidPackage (loc (DEM_CCA b)) Game_import DEM_CCA_out (DEM_CCA b).
   Proof.
     unfold DEM_CCA.
-    dprove_valid.
+    nssprove_valid.
   Qed.
 
 
@@ -563,13 +563,13 @@ Section KEMDEM.
   Proof.
     intros CD₀ CD₁ CK₀ CK₁ A.
     intros.
-    advantage_trans ((CK₁ || CD₀) ∘ KEY).
+    nssprove_adv_trans ((CK₁ || CD₀) ∘ KEY).
     erewrite ->
       (@Adv_par_link_l _ _ _ _ _ _ _ _ _ (ISET :|: IGEN) IGET).
-    (* why do we loop on first goal? with dprove_valid? *)
-    2-10: dprove_valid.
+    (* why do we loop on first goal? with nssprove_valid? *)
+    2-10: nssprove_valid.
     erewrite -> (@Adv_par_link_r _ _ _ _ _ _ _ _ _ IGEN IGET)
-      ; dprove_valid.
+      ; nssprove_valid.
   Qed.
 
   (** Corresponds to Lemma 19.b in the SSP paper *)
@@ -594,13 +594,13 @@ Section KEMDEM.
   Proof.
     intros CD₀ CD₁ CK₀ CK₁ A.
     intros.
-    advantage_trans ((CK₁ || CD₁) ∘ KEY).
+    nssprove_adv_trans ((CK₁ || CD₁) ∘ KEY).
     eapply lerD.
     - eapply @single_key_a. all: eauto.
     (* De-idealising the core keying package *)
     - erewrite Adv_sym.
       erewrite -> (@Adv_par_link_l _ _ _ _ _ _ _ _ _ (ISET :|: IGEN) IGET)
-        ; dprove_valid.
+        ; nssprove_valid.
   Qed.
 
   (** Perfect indistinguishability with PKE-CCA
@@ -622,7 +622,7 @@ Section KEMDEM.
 
   #[export] Instance Aux_valid {b : bool}
     : ValidPackage (loc (Aux b)) Game_import PKE_CCA_out (Aux b).
-  Proof. unfold Aux. dprove_valid. Qed.
+  Proof. unfold Aux. nssprove_valid. Qed.
 
   (** We extend ssprove_code_simpl to use code_link_scheme.
     It says that linking a scheme with anything results in the scheme itself
@@ -899,11 +899,11 @@ Hint Extern 5 (is_true (disj _ _)) =>
     unfold AdvFor.
     erewrite (Adv_perf_l (PKE_CCA_perf true)).
     erewrite (Adv_perf_r (PKE_CCA_perf false)).
-    unfold Aux; dprove_convert.
+    unfold Aux; nssprove_separate.
     erewrite Adv_sep_link.
     eapply le_trans.
     + eapply (single_key_b _ _ _ (KEM false)).
-      all: dprove_valid.
+      all: nssprove_valid.
     + by erewrite sep_link_assoc, sep_link_assoc, sep_link_assoc.
   Qed.
 End KEMDEM.

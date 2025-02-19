@@ -553,9 +553,9 @@ Qed.
 Lemma trimmed_link {E} {P Q} : trimmed E P → trimmed E (link P Q).
 Proof. intros tr. rewrite /trimmed -link_trim_commut tr //. Qed.
 
-Ltac dprove_trimmed :=
+Ltac nssprove_trimmed :=
   (try apply trimmed_empty_package) ||
-  ((apply trimmed_link || apply trimmed_package_cons); dprove_trimmed).
+  ((apply trimmed_link || apply trimmed_package_cons); nssprove_trimmed).
 
 Record module I E :=
   { module_locs : {fset Location}
@@ -593,7 +593,7 @@ Notation adversary I := (module I A_export).
 Notation "[ 'module' L ]" :=
   (Build_module L
     (mkpackage (mkfmap [::]) _)
-    ltac:(dprove_trimmed)
+    ltac:(nssprove_trimmed)
   )
   ( at level 0
   , only parsing )
@@ -602,7 +602,7 @@ Notation "[ 'module' L ]" :=
 Notation "[ 'module' L ; x1 ]" :=
   (Build_module L
     (mkpackage (mkfmap (x1 :: [::])) _)
-    ltac:(dprove_trimmed)
+    ltac:(nssprove_trimmed)
   )
   ( at level 0
   , x1 custom package at level 2
@@ -612,7 +612,7 @@ Notation "[ 'module' L ; x1 ]" :=
 Notation "[ 'module' L ; x1 ; x2 ; .. ; xn ]" :=
   (Build_module L
     (mkpackage (mkfmap (x1 :: x2 :: .. [:: xn] ..)) _)
-    ltac:(dprove_trimmed)
+    ltac:(nssprove_trimmed)
   )
   ( at level 0
   , x1 custom package at level 2
