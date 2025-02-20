@@ -23,7 +23,7 @@ Import PackageNotation.
 #[local] Open Scope package_scope.
 Import GroupScope GRing.Theory.
 
-From NominalSSP Require Import DDH Misc Scheme.
+From NominalSSP Require Import DDH Misc CKAScheme.
 
 
 Module CKA (GP : GroupParam).
@@ -39,36 +39,28 @@ Definition cka : cka_scheme := {|
   ; Pub := 'fin #|el|
   ; Mes := 'fin #|el|
   ; Key := 'fin #|el|
-  ; sample_Cip :=
+  ; StateS := 'fin #|el|
+  ; StateR := 'fin #|exp|
+  ; ckaS := λ γ,
     {code
-      c₁ ← sample uniform #|el| ;;
-      c₂ ← sample uniform #|el| ;;
-      ret (c₁, c₂)
-    }
-  ; keygen :=
-    {code
-      x0 ← sample uniform #|el| ;;
-      ret (x0, op_exp op_g x0)
-    }
-  ; cka-s := λ γ,
-    {code
-      x ← sample uniform #|el| ;;
-      h ← γ 
+      x ← sample uniform #|exp| ;;
+      let h := γ in 
       ret (x, op_exp op_g x, op_exp h x)
     }
-  ; cka-r := λ γ m,
+  ; ckaR := λ γ m,
     {code
-      x ← γ
-      h ← m
+      let x := γ in
+      let h := m in
       ret (h, op_exp h x)
     }
   |}.
 
 
-Theorem correct_elgamal : CORR0 elgamal ≈₀ CORR1 elgamal.
+Theorem correct_cka : CORR0 cka ≈₀ CORR1 cka.
 Proof.
   apply eq_rel_perf_ind_eq.
   simplify_eq_rel m.
+  split.
   apply r_const_sample_L.
   1: apply LosslessOp_uniform.
   intros sk.

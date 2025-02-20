@@ -27,14 +27,22 @@ Record cka_scheme :=
   ; Pub : choice_type
   ; Mes : choice_type
   ; Key: choice_type
-  ; StateS: choice_type
-  ; StateR: choice_type
 
-  ; ckaS : ∀ (state: StateS),
-      code fset0 [interface] (StateR × Mes × Key)
+  ; keygen :
+      code fset0 [interface] (Sec × Pub)
 
-  ; ckaR : ∀ (state: StateR) (m : Mes),
-      code fset0 [interface] (StateS × Key)
+  (* How to pass the keygen? *)
+  ; ckaInitA : ∀ (pk : Pub),
+      code fset0 [interface] (Pub)
+
+  ; ckaInitB : ∀ (sk : Sec),
+      code fset0 [interface] (Sec)
+
+  ; ckaS :
+      code fset0 [interface] (Mes × Key)
+
+  ; ckaR : ∀ (m : Mes),
+      code fset0 [interface] (Key)
   }.
 
 Notation " 'sec p " := (Sec p)
@@ -52,18 +60,6 @@ Notation " 'pub p " := (Pub p)
 Notation " 'mes p " := (Mes p)
   (in custom pack_type at level 2, p constr at level 20).
 
-Notation " 'stateS p " := (StateS p)
-  (at level 3) : package_scope.
-
-Notation " 'stateS p " := (StateS p)
-  (in custom pack_type at level 2, p constr at level 20).
-
-Notation " 'stateR p " := (StateR p)
-  (at level 3) : package_scope.
-
-Notation " 'stateR p " := (StateR p)
-  (in custom pack_type at level 2, p constr at level 20).
-
 (* How does Mes p work? *)
 Notation " 'mes p " := (Mes p)
   (at level 3) : package_scope.
@@ -71,7 +67,7 @@ Notation " 'mes p " := (Mes p)
 Definition CKAKEY := 0%N.
 
 Definition I_CORR (K : cka_scheme) :=
-  [interface #val #[ CKAKEY ] : 'stateS K × 'stateR K  → 'unit ].
+  [interface #val #[ CKAKEY ] : 'mes K × 'mes K  → 'unit ].
 
 Definition CORR0 (K : cka_scheme) :
   game (I_CORR K) :=
@@ -79,32 +75,30 @@ Definition CORR0 (K : cka_scheme) :
     (* takes a list of messages and runs epochs for length of list 
       "assert" on each loop that keys match
     *)
-    #def #[ CKAKEY ] (p : ('stateS K × 'stateR K)) : 'unit {
-      let '(stateS, stateR) := p in
+    #def #[ CKAKEY ] (ms : ('mes K × 'mes K)) : 'unit {
+      let '(m, m') := ms in
 
-      '(stateA, m, kA) ← K.(ckaS) stateS ;;
-      '(stateB, kB) ← K.(ckaR) stateR m ;;
+      '(skA, pkA) ← K.(keygen) ;;
+      '(skB, pkB) ← K.(keygen) ;;
+      stateA ← K.(ckaInitA) pkA ;;
+      stateB ← K.(ckaInitB) skB ;;
 
-      assert (kA == kB);;  
-
-      '(stateB', m', kB') ← K.(ckaS) stateB ;;
-      '(stateA', kA') ← K.(ckaR) stateA m' ;;
-
-      assert (kA' == kB');;       
-
+      '(stateA, m, k) ← K.(ckaS) stateA ;;
+      '(stateB, k') ← K.(ckaR) stateB m ;;
+      
       ret tt
     }
   ].
 
 Definition CORR1 (K : cka_scheme) :
-  game (I_CORR K) :=
-  [module no_locs ;
-    #def #[ CKAKEY ] (p : ('stateS K × 'stateR K)) : 'unit {
+  trimmed_package fset0 Game_import (I_CORR K) :=
+  [trimmed_package
+    #def #[ CKAKEY ] (m : 'mes K) : 'unit {
       ret tt
     }
   ].
 
-Definition CORR P b := if b then CORR0 P else CORR1 P.
+Definition CORR P b := if b then CORR0 P : nom_package else CORR1 P.
 
 Definition flag_loc : Location := ('option 'unit; 0%N).
 Definition mpk_loc (P : cka_scheme) : Location := ('option ('pub P); 1%N).
