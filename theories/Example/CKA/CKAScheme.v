@@ -71,7 +71,22 @@ Definition I_CORR_simple (K : cka_scheme) :=
 
 Definition I_CORR (K : cka_scheme) :=
   [interface #val #[ CKAKEY] : ('stateR K × 'n K)  → 'unit ].
-  
+
+Inductive nat : Type :=
+  | O : nat      (* game instead of nat *)
+  | S : nat -> nat.  (* game instead of nat *)
+
+Fixpoint correctI (n m : nat) : nat :=
+  match n with
+  | O => m
+  | S n' => S (add n' m) (* S(CORR_I) *)
+  end.
+
+Lemma addn0 : ∀ n, add n O = n. (* forall n, correct_0 n =~ correct_1 n *)
+  induction n.
+    - reflexivity.
+    - simpl. rewrite IHn. reflexivity.
+Qed.
 
 Definition CORR0_simple (K : cka_scheme) :
   game (I_CORR_simple K) :=
@@ -92,6 +107,14 @@ Definition CORR0_simple (K : cka_scheme) :
 
       #assert (kA' == kB') ;;
 
+
+
+
+      '(stateB'', m'', kB'') ← K.(ckaS) stateA' ;;
+      '(stateA'', kA'') ← K.(ckaR) stateB' m'' ;;
+
+      #assert (kA'' == kB'') ;;
+
       @ret 'unit Datatypes.tt
     }
   ].
@@ -107,8 +130,9 @@ Definition CORR1_simple (K : cka_scheme) :
 Definition CORR0 (K : cka_scheme) :
   game (I_CORR K) :=
   [module no_locs ;
-    #def #[ CKAKEY ] (state : ('stateR K × 'n K)) : 'unit {
+    #def #[ CKAKEY ] (state : ('stateR K × 'nat)) : 'unit {
       let '(x, n) := state in
+      
       
       '(pk) ← K.(keygen) x ;;
 
