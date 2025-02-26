@@ -23,7 +23,8 @@ Import PackageNotation.
 Module CKAscheme.
 
 Record cka_scheme :=
-  { Mes : choice_type
+  { N : choice_type
+  ; Mes : choice_type
   ; Key: choice_type
   ; StateS: choice_type
   ; StateR: choice_type
@@ -57,13 +58,23 @@ Notation " 'stateR p " := (StateR p)
 Notation " 'mes p " := (Mes p)
   (at level 3) : package_scope.
 
+Notation " 'n p " := (N p)
+  (at level 3) : package_scope.
+
+Notation " 'n p " := (N p)
+  (in custom pack_type at level 2, p constr at level 20).
+
 Definition CKAKEY := 0%N.
 
-Definition I_CORR (K : cka_scheme) :=
+Definition I_CORR_simple (K : cka_scheme) :=
   [interface #val #[ CKAKEY ] : 'stateR K  → 'unit ].
 
-Definition CORR0 (K : cka_scheme) :
-  game (I_CORR K) :=
+Definition I_CORR (K : cka_scheme) :=
+  [interface #val #[ CKAKEY] : ('stateR K × 'n K)  → 'unit ].
+  
+
+Definition CORR0_simple (K : cka_scheme) :
+  game (I_CORR_simple K) :=
   [module no_locs ;
     (* takes a list of messages and runs epochs for length of list 
       "assert" on each loop that keys match
@@ -85,6 +96,36 @@ Definition CORR0 (K : cka_scheme) :
     }
   ].
 
+Definition CORR1_simple (K : cka_scheme) :
+  game (I_CORR_simple K) :=
+  [module no_locs ;
+    #def #[ CKAKEY ] (s: 'stateR K) : 'unit {
+      @ret 'unit Datatypes.tt
+    }
+  ].
+  
+Definition CORR0 (K : cka_scheme) :
+  game (I_CORR K) :=
+  [module no_locs ;
+    #def #[ CKAKEY ] (state : ('stateR K × 'n K)) : 'unit {
+      let '(x, n) := state in
+      
+      '(pk) ← K.(keygen) x ;;
+
+      '(stateA, m, kA) ← K.(ckaS) pk ;;
+      '(stateB, kB) ← K.(ckaR) x m ;;
+
+      #assert (kA == kB) ;;
+
+      '(stateB', m', kB') ← K.(ckaS) stateB ;;
+      '(stateA', kA') ← K.(ckaR) stateA m' ;;
+
+      #assert (kA' == kB') ;;
+
+      @ret 'unit Datatypes.tt
+    }
+  ].
+  
 Definition CORR1 (K : cka_scheme) :
   game (I_CORR K) :=
   [module no_locs ;
