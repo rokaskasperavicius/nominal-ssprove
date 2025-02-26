@@ -129,7 +129,7 @@ Definition CORR0 (K : cka_scheme) :
 Definition CORR1 (K : cka_scheme) :
   game (I_CORR K) :=
   [module no_locs ;
-    #def #[ CKAKEY ] (s: 'stateR K) : 'unit {
+    #def #[ CKAKEY ] (state: ('stateR K × 'n K)) : 'unit {
       @ret 'unit Datatypes.tt
     }
   ].
