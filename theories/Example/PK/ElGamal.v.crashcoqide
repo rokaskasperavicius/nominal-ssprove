@@ -23,64 +23,59 @@ Import PackageNotation.
 #[local] Open Scope package_scope.
 Import GroupScope GRing.Theory.
 
-From NominalSSP Require Import DDH Misc CKAScheme.
+From NominalSSP Require Import DDH Misc Scheme.
 
 
-Module CKA (GP : GroupParam).
+Module ElGamal (GP : GroupParam).
 
 Module DDH' := DDH GP.
-Import CKAscheme DDH'.
+Import PKScheme DDH'.
 
 Module GT := GroupTheorems GP.
 Import GP GT.
 
-Definition cka : cka_scheme := {|
-    Mes := 'fin #|el|
-  ; Key := 'fin #|el|
-  ; StateS := 'fin #|el|
-  ; StateR := 'fin #|exp|
-  
-  ; keygen := λ sk, 
-    {code 
-      ret (op_exp op_g sk)
-    } 
-  ; ckaS := λ γ,
+Definition elgamal : pk_scheme := {|
+    Sec := 'fin #|exp|
+  ; Pub := 'fin #|el|
+  ; Mes := 'fin #|el|
+  ; Cip := 'fin #|el| × 'fin #|el|
+  ; sample_Cip :=
     {code
-      x ← sample uniform #|exp| ;;
-      let h := γ in 
-      ret (x, op_exp op_g x, op_exp h x)
+      c₁ ← sample uniform #|el| ;;
+      c₂ ← sample uniform #|el| ;;
+      ret (c₁, c₂)
     }
-  ; ckaR := λ γ m,
+  ; keygen :=
     {code
-      let x := γ in
-      let h := m in
-      ret (h, op_exp h x)
+      sk ← sample uniform #|exp| ;;
+      ret (sk, op_exp op_g sk)
+    }
+  ; enc := λ pk m,
+    {code
+      r ← sample uniform #|exp| ;;
+      ret (op_exp op_g r, op_mul m (op_exp pk r))
+    }
+  ; dec := λ sk c,
+    {code
+      ret (op_mul (snd c) (op_expn (fst c) sk))
     }
   |}.
 
 
-Theorem correct_cka : CORR0 cka ≈₀ CORR1 cka.
+Theorem correct_elgamal : CORR0 elgamal ≈₀ CORR1 elgamal.
 Proof.
   apply eq_rel_perf_ind_eq.
   simplify_eq_rel m.
   apply r_const_sample_L.
   1: apply LosslessOp_uniform.
-  intros x'.
-  unfold op_exp, op_g.
-  rewrite !otf_fto expgAC.
-  rewrite eq_refl.
-  simpl.
+  intros sk.
   apply r_const_sample_L.
   1: apply LosslessOp_uniform.
-  intros x''.
-  rewrite !otf_fto expgAC.
-  rewrite eq_refl.
-  simpl.
+  intros r.
   apply r_ret => s0 s1.
-  split.
-  Focus 2.
-  apply H.
-  reflexivity.
+  split; subst; [| done ].
+  unfold op_mul, op_exp, op_g, op_expn.
+  rewrite !otf_fto expgAC -mulgA mulgV mulg1 fto_otf //.
 Qed.
 
 
@@ -90,32 +85,40 @@ Definition RED_loc :=
   fset [:: stop_loc ].
 
 Definition RED :
-  trimmed_package RED_loc I_DDH (I_PK_OTSR elgamal) :=
-  [trimmed_package
+  module I_DDH (I_PK_OTSR elgamal) :=
+  [module RED_loc ;
     #def #[ GET ] (_ : 'unit) : 'el {
-      #import {sig #[ ONE ] : 'unit → 'el } as ONE ;;
+      #import {sig #[ GETA ] : 'unit → 'el } as GETA ;;
       getNone stop_loc ;;
       #put stop_loc := Some tt ;;
-      pk ← ONE tt ;;
+      pk ← GETA tt ;;
       @ret 'el pk
     } ;
     #def #[ QUERY ] (m : 'el) : 'el × 'el {
-      #import {sig #[ TWO ] : 'unit → 'el × 'el } as TWO ;;
+      #import {sig #[ GETBC ] : 'unit → 'el × 'el } as GETBC ;;
       _ ← getSome stop_loc ;;
-      '(r, sh) ← TWO tt ;;
+      '(r, sh) ← GETBC tt ;;
       @ret ('el × 'el) (r, op_mul m sh)
     }
   ].
 
 #[export] Instance valid_RED_DDH0
   : ValidPackage (RED_loc :|: DDH0_loc)
-      Game_import (I_PK_OTSR elgamal) (nom_link RED DDH0).
-Proof. dprove_valid. Qed.
+      Game_import (I_PK_OTSR elgamal) (RED ∘ DDH0)%share.
+Proof.
+  eapply valid_package_inject_locations.
+  2: nssprove_valid.
+  1: fset_solve.
+Qed.
 
 #[export] Instance valid_RED_DDH1
   : ValidPackage (RED_loc :|: DDH1_loc)
-      Game_import (I_PK_OTSR elgamal) (nom_link RED DDH1).
-Proof. dprove_valid. Qed.
+      Game_import (I_PK_OTSR elgamal) (RED ∘ DDH1)%share.
+Proof.
+  eapply valid_package_inject_locations.
+  2: nssprove_valid.
+  1: fset_solve.
+Qed.
 
 #[local] Hint Unfold DDH0_loc DDH1_loc PK_OTSR_loc RED_loc : in_fset_eq.
 
@@ -137,7 +140,7 @@ Proof.
   ssprove_invariant; [ apply fsubsetxx | done ].
 Qed.
 
-Lemma pk_ots0_perf : PK_OTSR0 elgamal ≈₀ nom_link RED DDH0.
+Lemma pk_ots0_perf : PK_OTSR0 elgamal ≈₀ (RED ∘ DDH0)%share.
 Proof.
   apply (eq_rel_perf_ind _ _ inv0).
   1: exact inv0_Invariant.
@@ -244,7 +247,7 @@ Proof.
   ssprove_invariant; [ apply fsubsetxx | done ].
 Qed.
 
-Lemma pk_ots1_perf : PK_OTSR1 elgamal ≈₀ nom_link RED DDH1.
+Lemma pk_ots1_perf : PK_OTSR1 elgamal ≈₀ (RED ∘ DDH1)%share.
 Proof.
   apply (eq_rel_perf_ind _ _ inv1).
   1: exact inv1_Invariant.
@@ -336,16 +339,16 @@ Proof.
     rewrite //= I2 I3 //.
 Qed.
 
-Theorem elgamal_sound {LA : {fset Location}}
-  : ∀ (A : trimmed_package LA (I_PK_OTSR elgamal) A_export),
-  AdvantageP (PK_OTSR elgamal) A = AdvantageP DDH (dlink A RED).
+Theorem elgamal_sound
+  : ∀ A : adversary (I_PK_OTSR elgamal),
+  AdvFor (PK_OTSR elgamal) A = AdvFor DDH (A ∘ RED).
 Proof.
   intros A.
-  unfold AdvantageP.
-  rewrite (AdvantageD_perf_l pk_ots0_perf).
-  rewrite (AdvantageD_perf_r pk_ots1_perf).
-  rewrite -AdvantageD_dlink.
-  dprove_convert.
+  unfold AdvFor.
+  rewrite (Adv_perf_l pk_ots0_perf).
+  rewrite (Adv_perf_r pk_ots1_perf).
+  rewrite -Adv_sep_link.
+  nssprove_separate.
 Qed.
 
 End ElGamal.

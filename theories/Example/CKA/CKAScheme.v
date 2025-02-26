@@ -23,12 +23,13 @@ Import PackageNotation.
 Module CKAscheme.
 
 Record cka_scheme :=
-  { Sec : choice_type
-  ; Pub : choice_type
-  ; Mes : choice_type
+  { Mes : choice_type
   ; Key: choice_type
   ; StateS: choice_type
   ; StateR: choice_type
+  
+  ; keygen : ∀ (x : StateR),
+    code fset0 [interface] (StateS)
 
   ; ckaS : ∀ (state: StateS),
       code fset0 [interface] (StateR × Mes × Key)
@@ -36,18 +37,6 @@ Record cka_scheme :=
   ; ckaR : ∀ (state: StateR) (m : Mes),
       code fset0 [interface] (StateS × Key)
   }.
-
-Notation " 'sec p " := (Sec p)
-  (in custom pack_type at level 2, p constr at level 20).
-
-Notation " 'sec p " := (Sec p)
-  (at level 3) : package_scope.
-
-Notation " 'pub p " := (Pub p)
-  (in custom pack_type at level 2, p constr at level 20).
-
-Notation " 'pub p " := (Pub p)
-  (at level 3) : package_scope.
 
 Notation " 'mes p " := (Mes p)
   (in custom pack_type at level 2, p constr at level 20).
@@ -71,7 +60,7 @@ Notation " 'mes p " := (Mes p)
 Definition CKAKEY := 0%N.
 
 Definition I_CORR (K : cka_scheme) :=
-  [interface #val #[ CKAKEY ] : 'stateS K × 'stateR K  → 'unit ].
+  [interface #val #[ CKAKEY ] : 'stateR K  → 'unit ].
 
 Definition CORR0 (K : cka_scheme) :
   game (I_CORR K) :=
@@ -79,36 +68,31 @@ Definition CORR0 (K : cka_scheme) :
     (* takes a list of messages and runs epochs for length of list 
       "assert" on each loop that keys match
     *)
-    #def #[ CKAKEY ] (p : ('stateS K × 'stateR K)) : 'unit {
-      let '(stateS, stateR) := p in
+    #def #[ CKAKEY ] (x : 'stateR K) : 'unit {
+      '(pk) ← K.(keygen) x ;;
 
-      '(stateA, m, kA) ← K.(ckaS) stateS ;;
-      '(stateB, kB) ← K.(ckaR) stateR m ;;
+      '(stateA, m, kA) ← K.(ckaS) pk ;;
+      '(stateB, kB) ← K.(ckaR) x m ;;
 
-      assert (kA == kB);;  
+      #assert (kA == kB) ;;
 
       '(stateB', m', kB') ← K.(ckaS) stateB ;;
       '(stateA', kA') ← K.(ckaR) stateA m' ;;
 
-      assert (kA' == kB');;       
+      #assert (kA' == kB') ;;
 
-      ret tt
+      @ret 'unit Datatypes.tt
     }
   ].
 
 Definition CORR1 (K : cka_scheme) :
   game (I_CORR K) :=
   [module no_locs ;
-    #def #[ CKAKEY ] (p : ('stateS K × 'stateR K)) : 'unit {
-      ret tt
+    #def #[ CKAKEY ] (s: 'stateR K) : 'unit {
+      @ret 'unit Datatypes.tt
     }
   ].
 
 Definition CORR P b := if b then CORR0 P else CORR1 P.
-
-Definition flag_loc : Location := ('option 'unit; 0%N).
-Definition mpk_loc (P : cka_scheme) : Location := ('option ('pub P); 1%N).
-Definition GET := 0%N.
-Definition QUERY := 1%N.
 
 End CKAscheme.
