@@ -83,10 +83,28 @@ Qed.
 
 Theorem correct_cka : CORR0 cka ≈₀ CORR1 cka.
 Proof.
-  apply eq_rel_perf_ind_eq.
+  apply (eq_rel_perf_ind _ _ (heap_ignore (fset [::]))).
+  1: ssprove_invariant; fset_solve.
   simplify_eq_rel m.
   destruct m.
-  eapply r_get_remember_lhs => mpk.
+  move : s.
+  induction s0.
+  - intros s.
+    simpl.
+    apply r_ret => s0 s1.
+    split.
+      + reflexivity.
+      + apply H.
+  - intros s.
+    simpl.
+    apply r_const_sample_L.
+    1: apply LosslessOp_uniform.
+    intros x'.
+    unfold op_exp, op_g in *.
+    rewrite !otf_fto expgAC in IHs0 |- *.
+    rewrite eq_refl.
+    simpl.
+    apply IHs0.
 Qed.
   
 Definition stop_loc : Location := ('option 'unit; 4%N).

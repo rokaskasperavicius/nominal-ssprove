@@ -91,32 +91,35 @@ Definition CORR1_simple (K : cka_scheme) :
     }
   ].
 
-  
-Definition CORR0 (K : cka_scheme) :
+Fixpoint repeat {A : choiceType} (n : nat) (x : A) (c : A → raw_code A) := 
+  match n with
+   | 0%N => ret x
+   | n.+1 => 
+      x' ← c x ;;
+      repeat n x' c
+  end.
+
+Instance valid_repeat:
+∀ {A : choiceType} (L : {fset Location}) (I : Interface) (c : A → raw_code A) (x : A) (N : nat),
+    (∀ i : A, ValidCode L I (c i)) → ValidCode L I (repeat N x c).
+Admitted.
+
+
+Definition CORR0 (K : cka_scheme) : 
   game (I_CORR K) :=
   [module CKA_loc K ;
     #def #[ CKAKEY ] (state : ('stateR K × 'nat)) : 'unit {
       let '(x, n) := state in
       '(pk) ← K.(keygen) x ;;
-
-      #put (states_loc K) := Some pk ;;
-      #put (stater_loc K) := Some x ;;
-
-      for_loop (fun i =>  
-        stateS ← getSome (states_loc K) ;;
-        stateR ← getSome (stater_loc K) ;;        
-        
+      
+      repeat (n) ((pk, x) : ('stateS K × 'stateR K))  (fun state =>       
+        let '(stateS, stateR) := state in
         '(stateR', m, kS) ← K.(ckaS) stateS ;;
         '(stateS', kR) ← K.(ckaR) stateR m ;;
 
         #assert (kS == kR) ;;
-
-        #put (states_loc K) := Some stateS' ;;
-        #put (stater_loc K) := Some stateR' ;;  
-
-        @ret 'unit Datatypes.tt
-      )(n) ;;
-
+        @ret ('stateS K × 'stateR K) (stateS', stateR')
+      ) ;;
       @ret 'unit Datatypes.tt
     }
   ].
