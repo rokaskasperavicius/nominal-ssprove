@@ -25,7 +25,6 @@ Import GroupScope GRing.Theory.
 
 From NominalSSP Require Import DDH Misc CKAScheme.
 
-
 Module CKA (GP : GroupParam).
 
 Module DDH' := DDH GP.
@@ -59,7 +58,7 @@ Definition cka : cka_scheme := {|
   |}.
 
 
-Theorem correct_cka : CORR0 cka ≈₀ CORR1 cka.
+Theorem correct_cka_simple : CORR0_simple cka ≈₀ CORR1_simple cka.
 Proof.
   apply eq_rel_perf_ind_eq.
   simplify_eq_rel m.
@@ -78,12 +77,18 @@ Proof.
   simpl.
   apply r_ret => s0 s1.
   split.
-  Focus 2.
-  apply H.
-  reflexivity.
+    - reflexivity.
+    - apply H.
 Qed.
 
-
+Theorem correct_cka : CORR0 cka ≈₀ CORR1 cka.
+Proof.
+  apply eq_rel_perf_ind_eq.
+  simplify_eq_rel m.
+  destruct m.
+  eapply r_get_remember_lhs => mpk.
+Qed.
+  
 Definition stop_loc : Location := ('option 'unit; 4%N).
 
 Definition RED_loc :=

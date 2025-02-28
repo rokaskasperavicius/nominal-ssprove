@@ -23,8 +23,7 @@ Import PackageNotation.
 Module CKAscheme.
 
 Record cka_scheme :=
-  { N : choice_type
-  ; Mes : choice_type
+  { Mes : choice_type
   ; Key: choice_type
   ; StateS: choice_type
   ; StateR: choice_type
@@ -39,9 +38,6 @@ Record cka_scheme :=
       code fset0 [interface] (StateS × Key)
   }.
 
-Notation " 'mes p " := (Mes p)
-  (in custom pack_type at level 2, p constr at level 20).
-
 Notation " 'stateS p " := (StateS p)
   (at level 3) : package_scope.
 
@@ -52,48 +48,24 @@ Notation " 'stateR p " := (StateR p)
   (at level 3) : package_scope.
 
 Notation " 'stateR p " := (StateR p)
-  (in custom pack_type at level 2, p constr at level 20).
-
-(* How does Mes p work? *)
-Notation " 'mes p " := (Mes p)
-  (at level 3) : package_scope.
-
-Notation " 'n p " := (N p)
-  (at level 3) : package_scope.
-
-Notation " 'n p " := (N p)
   (in custom pack_type at level 2, p constr at level 20).
 
 Definition CKAKEY := 0%N.
+Definition stater_loc (K: cka_scheme) : Location := ('option ('stateR K); 1%N).
+Definition states_loc (K: cka_scheme) : Location := ('option ('stateS K); 2%N).
+
+Definition CKA_loc (K : cka_scheme) :=
+  fset [:: stater_loc K ; states_loc K ].
 
 Definition I_CORR_simple (K : cka_scheme) :=
   [interface #val #[ CKAKEY ] : 'stateR K  → 'unit ].
 
 Definition I_CORR (K : cka_scheme) :=
-  [interface #val #[ CKAKEY] : ('stateR K × 'n K)  → 'unit ].
-
-Inductive nat : Type :=
-  | O : nat      (* game instead of nat *)
-  | S : nat -> nat.  (* game instead of nat *)
-
-Fixpoint correctI (n m : nat) : nat :=
-  match n with
-  | O => m
-  | S n' => S (add n' m) (* S(CORR_I) *)
-  end.
-
-Lemma addn0 : ∀ n, add n O = n. (* forall n, correct_0 n =~ correct_1 n *)
-  induction n.
-    - reflexivity.
-    - simpl. rewrite IHn. reflexivity.
-Qed.
+  [interface #val #[ CKAKEY] : ('stateR K × 'nat)  → 'unit ].
 
 Definition CORR0_simple (K : cka_scheme) :
   game (I_CORR_simple K) :=
   [module no_locs ;
-    (* takes a list of messages and runs epochs for length of list 
-      "assert" on each loop that keys match
-    *)
     #def #[ CKAKEY ] (x : 'stateR K) : 'unit {
       '(pk) ← K.(keygen) x ;;
 
@@ -107,14 +79,6 @@ Definition CORR0_simple (K : cka_scheme) :
 
       #assert (kA' == kB') ;;
 
-
-
-
-      '(stateB'', m'', kB'') ← K.(ckaS) stateA' ;;
-      '(stateA'', kA'') ← K.(ckaR) stateB' m'' ;;
-
-      #assert (kA'' == kB'') ;;
-
       @ret 'unit Datatypes.tt
     }
   ].
@@ -126,25 +90,32 @@ Definition CORR1_simple (K : cka_scheme) :
       @ret 'unit Datatypes.tt
     }
   ].
+
   
 Definition CORR0 (K : cka_scheme) :
   game (I_CORR K) :=
-  [module no_locs ;
+  [module CKA_loc K ;
     #def #[ CKAKEY ] (state : ('stateR K × 'nat)) : 'unit {
       let '(x, n) := state in
-      
-      
       '(pk) ← K.(keygen) x ;;
 
-      '(stateA, m, kA) ← K.(ckaS) pk ;;
-      '(stateB, kB) ← K.(ckaR) x m ;;
+      #put (states_loc K) := Some pk ;;
+      #put (stater_loc K) := Some x ;;
 
-      #assert (kA == kB) ;;
+      for_loop (fun i =>  
+        stateS ← getSome (states_loc K) ;;
+        stateR ← getSome (stater_loc K) ;;        
+        
+        '(stateR', m, kS) ← K.(ckaS) stateS ;;
+        '(stateS', kR) ← K.(ckaR) stateR m ;;
 
-      '(stateB', m', kB') ← K.(ckaS) stateB ;;
-      '(stateA', kA') ← K.(ckaR) stateA m' ;;
+        #assert (kS == kR) ;;
 
-      #assert (kA' == kB') ;;
+        #put (states_loc K) := Some stateS' ;;
+        #put (stater_loc K) := Some stateR' ;;  
+
+        @ret 'unit Datatypes.tt
+      )(n) ;;
 
       @ret 'unit Datatypes.tt
     }
@@ -153,7 +124,7 @@ Definition CORR0 (K : cka_scheme) :
 Definition CORR1 (K : cka_scheme) :
   game (I_CORR K) :=
   [module no_locs ;
-    #def #[ CKAKEY ] (state: ('stateR K × 'n K)) : 'unit {
+    #def #[ CKAKEY ] (state: ('stateR K × 'nat)) : 'unit {
       @ret 'unit Datatypes.tt
     }
   ].
