@@ -102,8 +102,15 @@ Fixpoint repeat {A : choiceType} (n : nat) (x : A) (c : A → raw_code A) :=
 Instance valid_repeat:
 ∀ {A : choiceType} (L : {fset Location}) (I : Interface) (c : A → raw_code A) (x : A) (N : nat),
     (∀ i : A, ValidCode L I (c i)) → ValidCode L I (repeat N x c).
-Admitted.
-
+    intros.
+    generalize dependent x.
+    induction N as [|N IH]; intros x0.
+    - simpl. eapply valid_ret.
+    - simpl. eapply valid_bind.
+      + eapply H.
+      + intros x'.
+        apply IH.
+Qed.
 
 Definition CORR0 (K : cka_scheme) : 
   game (I_CORR K) :=
