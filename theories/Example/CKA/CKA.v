@@ -106,7 +106,7 @@ Proof.
     simpl.
     apply IHs0.
 Qed.
-  
+
 Definition stop_loc : Location := ('option 'unit; 4%N).
 
 Definition RED_loc :=

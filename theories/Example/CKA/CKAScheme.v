@@ -50,6 +50,18 @@ Notation " 'stateR p " := (StateR p)
 Notation " 'stateR p " := (StateR p)
   (in custom pack_type at level 2, p constr at level 20).
 
+Notation " 'mes p " := (Mes p)
+  (in custom pack_type at level 2, p constr at level 20).
+
+Notation " 'mes p " := (Mes p)
+  (at level 3) : package_scope.
+
+Notation " 'key p " := (Key p)
+  (in custom pack_type at level 2, p constr at level 20).
+
+Notation " 'key p " := (Key p)
+  (at level 3) : package_scope.
+
 Definition CKAKEY := 0%N.
 Definition stater_loc (K: cka_scheme) : Location := ('option ('stateR K); 1%N).
 Definition states_loc (K: cka_scheme) : Location := ('option ('stateS K); 2%N).
@@ -139,6 +151,67 @@ Definition CORR1 (K : cka_scheme) :
     }
   ].
 
-Definition CORR P b := if b then CORR0 P else CORR1 P.
+Definition CORR K b := if b then CORR0 K else CORR1 K.
 
+
+Definition INIT := 3%N.
+Definition SEND_A := 4%N.
+Definition RCV_A := 5%N.
+Definition CHALL_A := 6%N.
+Definition SEND_B := 7%N.
+Definition RCV_B := 8%N.
+Definition CHALL_B := 9%N.
+
+Definition I_CKA_PCS (K : cka_scheme) :=
+  [interface
+    #val #[ INIT ] : 'stateR K → 'unit ;
+
+    #val #[ SEND_A ] : 'unit → ('mes K × 'key K) ;
+    #val #[ RCV_A ] : 'unit → 'key K;
+    #val #[ CHALL_A ] : 'unit → ('mes K × 'key K) ;
+
+    #val #[ SEND_B ] : 'unit → ('mes K × 'key K) ;
+    #val #[ RCV_B ] : 'unit → 'key K ;
+    #val #[ CHALL_B ] : 'unit → ('mes K × 'key K) 
+  ].
+
+
+Definition epoch_a (K: cka_scheme) : Location := ('option ('nat); 10%N).
+Definition epoch_b (K: cka_scheme) : Location := ('option ('nat); 11%N).
+Definition b_loc (K: cka_scheme) : Location := ('option ('nat); 12%N).
+
+Definition CKA_PCS_locs (K : cka_scheme) :=
+  fset [:: stater_loc K ; states_loc K ; epoch_a K ; epoch_b K ].
+
+Definition CKA_PCS (K : cka_scheme) b :
+  game (I_CKA_PCS K) :=
+  [module CKA_PCS_locs K;
+    #def #[ INIT ] (x : 'stateR K) : 'unit {
+     '(pk) ← K.(keygen) x ;;
+     #put (states_loc K) := Some pk ;;
+     #put (stater_loc K) := Some x ;;
+     #put (epoch_a K) := Some 0 ;;
+     #put (epoch_b K) := Some 0 ;;
+     @ret 'unit Datatypes.tt
+    } ;
+    #def #[ SEND_A ] _ : ('mes K × 'key K) {
+    
+      
+    } ;
+    #def #[ RCV_A ] _ : 'key K {
+    } ;
+    #def #[ CHALL_A ] _ : ('mes K × 'key K) {
+    } ;
+    #def #[ SEND_B ] _ : ('mes K × 'key K) {
+    } ;
+    #def #[ RCV_B ] _ : 'key K {
+    } ;
+    #def #[ CHALL_B ] _ : ('mes K × 'key K) {
+    } ;
+
+  ].
+  
+  
+
+  
 End CKAscheme.
