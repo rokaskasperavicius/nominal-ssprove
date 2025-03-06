@@ -39,9 +39,16 @@ Definition cka : cka_scheme := {|
   ; StateS := 'fin #|el|
   ; StateR := 'fin #|exp|
   
-  ; keygen := λ sk, 
+  ; sampleKey :=
     {code 
-      ret (op_exp op_g sk)
+      x ← sample uniform #|exp| ;;
+      ret (op_exp op_g x)
+    }
+  
+  ; keygen := 
+    {code 
+      x ← sample uniform #|exp| ;;
+      ret (op_exp op_g x, x)
     } 
   ; ckaS := λ γ,
     {code
@@ -64,8 +71,11 @@ Proof.
   simplify_eq_rel m.
   apply r_const_sample_L.
   1: apply LosslessOp_uniform.
-  intros x'.
+  intros x.
   unfold op_exp, op_g.
+  apply r_const_sample_L.
+  1: apply LosslessOp_uniform.
+  intros x'.
   rewrite !otf_fto expgAC.
   rewrite eq_refl.
   simpl.
@@ -83,52 +93,155 @@ Qed.
 
 Theorem correct_cka : CORR0 cka ≈₀ CORR1 cka.
 Proof.
+  (*Fix heap_ignore, shouldnt be here*)
   apply (eq_rel_perf_ind _ _ (heap_ignore (fset [::]))).
   1: ssprove_invariant; fset_solve.
   simplify_eq_rel m.
-  destruct m.
-  move : s.
-  induction s0.
-  - intros s.
-    simpl.
+  apply r_const_sample_L.
+  1: apply LosslessOp_uniform.
+  induction m.
+  - simpl.
+    intros x.
     apply r_ret => s0 s1.
     split.
       + reflexivity.
       + apply H.
-  - intros s.
-    simpl.
+  - simpl.
+    intros x.
     apply r_const_sample_L.
     1: apply LosslessOp_uniform.
     intros x'.
     unfold op_exp, op_g in *.
-    rewrite !otf_fto expgAC in IHs0 |- *.
+    rewrite !otf_fto expgAC in IHm |- *.
     rewrite eq_refl.
     simpl.
-    apply IHs0.
+    apply IHm.
 Qed.
 
-Definition stop_loc : Location := ('option 'unit; 4%N).
+  
+Definition red_epoch_a : Location := ('nat; 10%N).
+Definition red_epoch_b : Location := ('nat; 11%N).
+
+Definition state_sa_loc (K: cka_scheme) : Location := ('stateS K; 13%N).
+Definition state_sb_loc (K: cka_scheme) : Location := ('stateS K; 14%N).
+Definition state_ra_loc (K: cka_scheme) : Location := ('stateR K; 15%N).
+Definition state_rb_loc (K: cka_scheme) : Location := ('stateR K; 16%N).
+
+Definition red_max_epoc : Location := ('nat; 17%N).
 
 Definition RED_loc :=
-  fset [:: stop_loc ].
+  fset [::red_epoch_a ; red_epoch_b ; red_max_epoc ].
 
 Definition RED :
-  trimmed_package RED_loc I_DDH (I_PK_OTSR elgamal) :=
-  [trimmed_package
-    #def #[ GET ] (_ : 'unit) : 'el {
-      #import {sig #[ ONE ] : 'unit → 'el } as ONE ;;
-      getNone stop_loc ;;
-      #put stop_loc := Some tt ;;
-      pk ← ONE tt ;;
-      @ret 'el pk
+  module I_DDH (I_CKA_PCS cka) :=
+  [module RED_loc;
+    #def #[ INIT ] (_ : 'unit) : 'unit {
+      x ← sample uniform #|exp| ;;
+      let '(pk) := op_exp op_g x in
+
+      #put (state_sa_loc K) := pk ;;
+      #put (state_sb_loc K) := pk ;;
+      #put (state_ra_loc K) := x ;;
+      #put (state_rb_loc K) := x ;;
+
+      #put epoch_a := 0 ;;
+      #put epoch_b := 0 ;;
+
+      @ret 'unit Datatypes.tt
     } ;
-    #def #[ QUERY ] (m : 'el) : 'el × 'el {
-      #import {sig #[ TWO ] : 'unit → 'el × 'el } as TWO ;;
-      _ ← getSome stop_loc ;;
-      '(r, sh) ← TWO tt ;;
-      @ret ('el × 'el) (r, op_mul m sh)
+
+    #def #[ SEND_A ] (_ : 'unit) : ('mes K × 'key K) {    
+      #import {sig #[ GETA ] : 'unit → 'el } as GETA ;;
+      #import {sig #[ GETBC ] : 'unit → 'el × 'el } as GETBC ;;
+      pk ← GETA tt ;;
+      '(m, k) ← GETBC tt ;;
+      @ret ('el × 'el) (m, k)
+    } ;
+
+    #def #[ RCV_A ] (m : 'mes K) : 'unit {
+      epoch ← get epoch_a ;;
+      #put epoch_a := epoch.+1 ;;
+
+      stateRA ← get state_ra_loc K ;;
+      '(stateSA, k) ← K.(ckaR) stateRA m ;;
+
+      #put (state_sa_loc K) := stateSA ;;
+
+      @ret 'unit Datatypes.tt
+    } ;
+
+    #def #[ CHALL_A ] (_ : 'unit) : ('mes K × 'key K) {
+      #import {sig #[ GETA ] : 'unit → 'el } as GETA ;;
+      #import {sig #[ GETBC ] : 'unit → 'el × 'el } as GETBC ;;
+      
+      epoch ← get epoch_a ;;
+      #put epoch_a := epoch.+1 ;;
+
+      #assert (t == epoch.+1) ;;
+
+      _ ← GETA tt ;;
+      '(m, k) ← GETBC tt ;;
+      
+      (*#put (state_ra_loc K) := tt ;; HOW DO WE GET b in g^b form DDH*)
+      @ret ('mes K × 'key K) (m, k)
+    } ;
+
+    #def #[ SEND_B ] (_ : 'unit) : ('mes K × 'key K) {
+      epoch ← get epoch_b ;;
+      #put epoch_b := epoch.+1 ;;
+
+      stateSB ← get state_sb_loc K ;;
+      '(stateRB, m, k) ← K.(ckaS) stateSB ;;
+
+      #put (state_rb_loc K) := stateRB ;;
+    
+      @ret ('mes K × 'key K) (m, k)
+    } ;
+
+    #def #[ RCV_B ] (m : 'mes K) : 'unit {
+      epoch ← get epoch_b ;;
+      #put epoch_b := epoch.+1 ;;
+
+      stateRB ← get state_rb_loc K ;;
+      '(stateSB, k) ← K.(ckaR) stateRB m ;;
+
+      #put (state_sb_loc K) := stateSB ;;
+
+      @ret 'unit Datatypes.tt
+    } ;
+
+    #def #[ CHALL_B ] (_ : 'unit) : ('mes K × 'key K) {
+      epoch ← get epoch_b ;;
+      #put epoch_b := epoch.+1 ;;
+
+      #assert (t == epoch.+1) ;;
+
+      stateSB ← get state_sb_loc K ;;
+      '(stateRB, m, k) ← K.(ckaS) stateSB ;;
+
+      #put (state_rb_loc K) := stateRB ;;
+      
+      if b then
+        @ret ('mes K × 'key K) (m, k)
+      else
+        k' ← K.(sampleKey) ;;
+        @ret ('mes K × 'key K) (m, k')
     }
+
   ].
+  
+    
+Notation init' := (
+  mpk ← get PKScheme.init_loc elgamal ;;
+  match mpk with
+  | None => 
+    #import {sig #[ GETA ] : 'unit → 'el } as GETA ;;
+    pk ← GETA tt ;;
+    #put PKScheme.init_loc elgamal := Some pk ;;
+    ret pk
+  | Some pk =>
+    ret pk
+  end).
 
 #[export] Instance valid_RED_DDH0
   : ValidPackage (RED_loc :|: DDH0_loc)
