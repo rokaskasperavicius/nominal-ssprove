@@ -133,7 +133,7 @@ Definition RED_loc :=
   fset [::red_epoch_a ; red_epoch_b ; red_max_epoch ].
 
 Definition RED :
-  module I_DDH (I_CKA_PCS cka) :=
+  module I_DDH (I_CKA_PCS cka) := 
   [module RED_loc;
     #def #[ INIT ] (_ : 'unit) : 'unit {
       x ← sample uniform #|exp| ;;
