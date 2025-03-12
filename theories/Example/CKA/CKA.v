@@ -130,9 +130,9 @@ Definition state_rb_loc (K: cka_scheme) : Location := ('stateR K; 16%N).
 Definition red_max_epoch : Location := ('nat; 17%N).
 
 Definition RED_loc :=
-  fset [::red_epoch_a ; red_epoch_b ; red_max_epoch ].
+  fset [::red_epoch_a ; red_epoch_b ].
 
-Definition RED :
+Definition RED t :
   module I_DDH (I_CKA_PCS cka) :=
   [module RED_loc;
     #def #[ INIT ] (_ : 'unit) : 'unit {
@@ -153,7 +153,26 @@ Definition RED :
     #def #[ SEND_A ] (_ : 'unit) : ('mes cka × 'key cka) {    
       #import {sig #[ GETA ] : 'unit → 'el } as GETA ;;
       #import {sig #[ GETBC ] : 'unit → 'el × 'el } as GETBC ;;
-      pk ← GETA tt ;;
+
+      epoch ← get epoch_a ;;
+      let epoch_inc := epoch.+1 in
+      #put epoch_a := epoch_inc ;;
+
+      if epoch_inc == t.-1 then
+        pk ← GETA tt ;;
+        stateRB ← get state_rb_loc cka ;;
+        @ret ('el × 'el) (pk, op_exp pk stateRB) ;;
+      else
+        if epoch_inc == t then (* should this not exist here *)
+          '(m, k) ← GETBC tt ;; (* cannot cal getA again, getBC needs to reference t-1 getA *)
+          @ret ('el × 'el) (m, k) ;;
+        else
+          if epoch_inc == t.+1 then
+            
+          
+        
+      
+
       '(m, k) ← GETBC tt ;;
       @ret ('el × 'el) (m, k)
     } ;
@@ -175,16 +194,22 @@ Definition RED :
       #import {sig #[ GETBC ] : 'unit → 'el × 'el } as GETBC ;;
       
       epoch ← get epoch_a ;;
-      #put epoch_a := epoch.+1 ;;
-      t ← get red_max_epoch ;;
       
       #assert (t == epoch.+1) ;;
+
+
+
+
+
+
+
+      #put epoch_a := epoch.+1 ;;
 
       _ ← GETA tt ;;
       '(m, k) ← GETBC tt ;;
       
       (*#put (state_ra_loc K) := tt ;; HOW DO WE GET b in g^b form DDH*)
-      @ret ('mes cka × 'key cka) (m, cka)
+      @ret ('mes cka × 'key cka) (m, k)
     } ;
 
     #def #[ SEND_B ] (_ : 'unit) : ('mes cka × 'key cka) {
@@ -222,12 +247,8 @@ Definition RED :
       '(stateRB, m, k) ← cka.(ckaS) stateSB ;;
 
       #put (state_rb_loc cka) := stateRB ;;
-      
-      if b then
-        @ret ('mes cka × 'key cka) (m, k)
-      else
-        k' ← K.(sampleKey) ;;
-        @ret ('mes cka × 'key cka) (m, k')
+
+      @ret ('mes cka × 'key cka) (m, k)
     }
 
   ].
