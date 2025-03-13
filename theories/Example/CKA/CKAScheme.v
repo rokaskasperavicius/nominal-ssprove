@@ -168,11 +168,9 @@ Definition I_CKA_PCS (K : cka_scheme) :=
 
     #val #[ SEND_A ] : 'unit → ('mes K × 'key K) ;
     #val #[ RCV_A ] : 'mes K → 'unit;
-    #val #[ CHALL_A ] : 'unit → ('mes K × 'key K) ;
 
     #val #[ SEND_B ] : 'unit → ('mes K × 'key K) ;
-    #val #[ RCV_B ] : 'mes K → 'unit ;
-    #val #[ CHALL_B ] : 'unit → ('mes K × 'key K) 
+    #val #[ RCV_B ] : 'mes K → 'unit 
   ].
 
 
@@ -206,14 +204,18 @@ Definition CKA_PCS (K : cka_scheme) b t :
 
     #def #[ SEND_A ] (_ : 'unit) : ('mes K × 'key K) {
       epoch ← get epoch_a ;;
-      #put epoch_a := epoch.+1 ;;
+      let epoch_inc := epoch.+1 in
+      #put epoch_a := epoch_inc ;;
 
       stateSA ← get state_sa_loc K ;;
       '(stateRA, m, k) ← K.(ckaS) stateSA ;;
-
       #put (state_ra_loc K) := stateRA ;;
-    
-      @ret ('mes K × 'key K) (m, k)
+
+      if (t == epoch_inc) && ~~b then
+        k' ← K.(sampleKey) ;;
+        @ret ('mes K × 'key K) (m, k')
+      else
+        @ret ('mes K × 'key K) (m, k)
     } ;
 
     #def #[ RCV_A ] (m : 'mes K) : 'unit {
@@ -228,26 +230,9 @@ Definition CKA_PCS (K : cka_scheme) b t :
       @ret 'unit Datatypes.tt
     } ;
 
-    #def #[ CHALL_A ] (_ : 'unit) : ('mes K × 'key K) {
-      epoch ← get epoch_a ;;
-      #put epoch_a := epoch.+1 ;;
-
-      #assert (t == epoch.+1) ;;
-
-      stateSA ← get state_sa_loc K ;;
-      '(stateRA, m, k) ← K.(ckaS) stateSA ;;
-
-      #put (state_ra_loc K) := stateRA ;;
-      
-      if b then
-        @ret ('mes K × 'key K) (m, k)
-      else
-        k' ← K.(sampleKey) ;;
-        @ret ('mes K × 'key K) (m, k')
-    } ;
-
     #def #[ SEND_B ] (_ : 'unit) : ('mes K × 'key K) {
       epoch ← get epoch_b ;;
+      let epoch_inc := epoch.+1 in
       #put epoch_b := epoch.+1 ;;
 
       stateSB ← get state_sb_loc K ;;
@@ -255,7 +240,11 @@ Definition CKA_PCS (K : cka_scheme) b t :
 
       #put (state_rb_loc K) := stateRB ;;
     
-      @ret ('mes K × 'key K) (m, k)
+      if (t == epoch_inc) && ~~b then
+        k' ← K.(sampleKey) ;;
+        @ret ('mes K × 'key K) (m, k')
+      else
+        @ret ('mes K × 'key K) (m, k)
     } ;
 
     #def #[ RCV_B ] (m : 'mes K) : 'unit {
@@ -268,25 +257,7 @@ Definition CKA_PCS (K : cka_scheme) b t :
       #put (state_sb_loc K) := stateSB ;;
 
       @ret 'unit Datatypes.tt
-    } ;
-
-    #def #[ CHALL_B ] (_ : 'unit) : ('mes K × 'key K) {
-      epoch ← get epoch_b ;;
-      #put epoch_b := epoch.+1 ;;
-
-      #assert (t == epoch.+1) ;;
-
-      stateSB ← get state_sb_loc K ;;
-      '(stateRB, m, k) ← K.(ckaS) stateSB ;;
-
-      #put (state_rb_loc K) := stateRB ;;
-      
-      if b then
-        @ret ('mes K × 'key K) (m, k)
-      else
-        k' ← K.(sampleKey) ;;
-        @ret ('mes K × 'key K) (m, k')
-    }
-  ].
+    } 
+ ].
   
 End CKAscheme.
